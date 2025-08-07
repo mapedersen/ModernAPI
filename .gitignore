@@ -1,0 +1,63 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+*.cache
+.vs/
+.vscode/
+*.log
+*.tmp
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Environment variables
+.env
+.env.local
+.env.production
+
+# Database
+*.db
+*.sqlite
+
+# Logs
+logs/
+*.log
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+
+# Node modules (for future frontend)
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+
+# Package managers
+package-lock.json
+yarn.lock
+
+# Docker
+.docker/
+
+# JetBrains Rider
+.idea/
+*.sln.iml
+
+# Local development
+appsettings.local.json
