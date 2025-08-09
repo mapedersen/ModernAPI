@@ -1,12 +1,15 @@
 {
-  "name": "modernapi-frontend",
+  "name": "ModernAPI-frontend",
   "version": "1.0.0",
   "private": true,
   "sideEffects": false,
   "type": "module",
   "scripts": {
     "dev": "vite dev",
+    "dev:clean": "VITE_ENABLE_DOCS=false vite dev",
+    "dev:docs": "VITE_ENABLE_DOCS=true vite dev",
     "build": "vite build && tsc --noEmit",
+    "build:clean": "VITE_ENABLE_DOCS=false vite build && tsc --noEmit",
     "start": "bun run .output/server/index.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",

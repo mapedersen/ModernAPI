@@ -1,12 +1,12 @@
 import { Link, useLocation } from '@tanstack/react-router'
 import { cn } from '~/lib/utils'
-import { platformSections } from '~/data/platform'
+import { platformSections, handbookItem } from '~/data/platform'
 import { ChevronDown, ChevronRight, BookOpen } from 'lucide-react'
 import React, { useState } from 'react'
 
 export function Navigation() {
   const location = useLocation()
-  const [expandedSections, setExpandedSections] = useState<string[]>(['learn', 'tools']) // Default expand main sections
+  const [expandedSections, setExpandedSections] = useState<string[]>([]) // All sections collapsed by default
   
   const toggleSection = (sectionId: string) => {
     setExpandedSections(prev => 
@@ -25,7 +25,7 @@ export function Navigation() {
   }
 
   return (
-    <nav className="w-80 bg-card border-r border-border h-screen overflow-y-auto flex flex-col">
+    <nav className="fixed left-0 top-0 w-80 bg-card border-r border-border h-screen overflow-y-auto flex flex-col z-10">
       {/* Header */}
       <div className="p-6 border-b border-border">
         <Link to="/" className="flex items-center gap-3 group hover:bg-accent/50 rounded-lg p-2 -m-2 transition-colors">
@@ -35,6 +35,50 @@ export function Navigation() {
           <div>
             <h2 className="font-semibold text-xl group-hover:text-primary transition-colors">ModernAPI</h2>
             <p className="text-sm text-muted-foreground">Technical Documentation</p>
+          </div>
+        </Link>
+      </div>
+
+      {/* Handbook - Top Level */}
+      <div className="p-4 border-b border-border">
+        <Link
+          to={handbookItem.path}
+          className={cn(
+            'flex items-start gap-3 p-3 rounded-lg hover:bg-accent/50 transition-colors group w-full',
+            location.pathname === handbookItem.path && 'bg-accent ring-2 ring-primary/20'
+          )}
+        >
+          <div className="flex items-center gap-2 mt-0.5">
+            <span className="text-lg">{handbookItem.icon}</span>
+          </div>
+          
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <h4 className={cn(
+                'font-medium text-sm',
+                location.pathname === handbookItem.path && 'text-primary'
+              )}>
+                {handbookItem.title}
+              </h4>
+              <span className="text-xs text-muted-foreground">
+                {handbookItem.estimatedTime}
+              </span>
+            </div>
+            
+            <p className="text-xs text-muted-foreground line-clamp-2 group-hover:text-foreground/80 transition-colors">
+              {handbookItem.description}
+            </p>
+            
+            <div className="mt-2">
+              <span className={cn(
+                'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium',
+                handbookItem.difficulty === 'beginner' && 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400',
+                handbookItem.difficulty === 'intermediate' && 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400',
+                handbookItem.difficulty === 'advanced' && 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
+              )}>
+                {handbookItem.difficulty}
+              </span>
+            </div>
           </div>
         </Link>
       </div>

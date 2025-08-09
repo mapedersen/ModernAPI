@@ -11,8 +11,9 @@ import type {
   LogoutResponse,
   OperationResult
 } from '~/types/auth'
+import type { GetUsersResponse } from '~/types/user'
 
-const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:5051'
+const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:5000'
 
 // Helper to extract cookies
 function extractTokenFromCookies(cookies: string, tokenName: string): string | null {
@@ -215,5 +216,35 @@ export const changePassword = createServerFn({ method: 'POST' })
       return await response.json() as OperationResult
     } catch (error) {
       throw new Error(error instanceof Error ? error.message : 'Password change failed')
+    }
+  })
+
+// Users API Functions
+export const getUsers = createServerFn({ method: 'GET' })
+  .validator(() => ({})) // No input validation needed for GET
+  .handler(async () => {
+    try {
+      const cookies = getHeader('Cookie') || ''
+      const accessToken = extractTokenFromCookies(cookies, 'accessToken')
+      
+      if (!accessToken) {
+        throw new Error('Not authenticated')
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/users?page=1&pageSize=10`, {
+        headers: { 
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || 'Failed to fetch users')
+      }
+
+      return await response.json() as GetUsersResponse
+    } catch (error) {
+      throw new Error(error instanceof Error ? error.message : 'Failed to fetch users')
     }
   })

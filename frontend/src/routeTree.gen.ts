@@ -11,88 +11,56 @@
 import { createServerRootRoute } from '@tanstack/react-start/server'
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as WelcomeRouteImport } from './routes/welcome'
-import { Route as UsersRouteImport } from './routes/users'
-import { Route as RedirectRouteImport } from './routes/redirect'
-import { Route as PostsRouteImport } from './routes/posts'
-import { Route as HandbookRouteImport } from './routes/handbook'
-import { Route as DeferredRouteImport } from './routes/deferred'
-import { Route as PathlessLayoutRouteImport } from './routes/_pathlessLayout'
+import { Route as DocsRouteImport } from './routes/docs'
+import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as UsersIndexRouteImport } from './routes/users.index'
-import { Route as ToolsIndexRouteImport } from './routes/tools/index'
-import { Route as ReferenceIndexRouteImport } from './routes/reference/index'
-import { Route as PostsIndexRouteImport } from './routes/posts.index'
-import { Route as LearnIndexRouteImport } from './routes/learn/index'
-import { Route as GuidesIndexRouteImport } from './routes/guides/index'
-import { Route as UsersUserIdRouteImport } from './routes/users.$userId'
-import { Route as ToolsScaffoldingRouteImport } from './routes/tools/scaffolding'
-import { Route as ToolsMonitoringRouteImport } from './routes/tools/monitoring'
-import { Route as ToolsApiPlaygroundRouteImport } from './routes/tools/api-playground'
-import { Route as ReferenceStandardsRouteImport } from './routes/reference/standards'
-import { Route as ReferencePatternsRouteImport } from './routes/reference/patterns'
-import { Route as ReferenceConfigRouteImport } from './routes/reference/config'
-import { Route as ReferenceApiRouteImport } from './routes/reference/api'
-import { Route as ReferenceAdrRouteImport } from './routes/reference/adr'
-import { Route as PostsPostIdRouteImport } from './routes/posts.$postId'
-import { Route as LearnTestingRouteImport } from './routes/learn/testing'
-import { Route as LearnRestApiRouteImport } from './routes/learn/rest-api'
-import { Route as LearnFrontendRouteImport } from './routes/learn/frontend'
-import { Route as LearnDatabaseRouteImport } from './routes/learn/database'
-import { Route as LearnCachingRouteImport } from './routes/learn/caching'
-import { Route as LearnAuthenticationRouteImport } from './routes/learn/authentication'
-import { Route as LearnArchitectureRouteImport } from './routes/learn/architecture'
-import { Route as GuidesTroubleshootingRouteImport } from './routes/guides/troubleshooting'
-import { Route as GuidesTestingRouteImport } from './routes/guides/testing'
-import { Route as GuidesMigrationsRouteImport } from './routes/guides/migrations'
-import { Route as GuidesGitWorkflowRouteImport } from './routes/guides/git-workflow'
-import { Route as GuidesDeploymentRouteImport } from './routes/guides/deployment'
-import { Route as GuidesCustomizationRouteImport } from './routes/guides/customization'
-import { Route as GuidesAddEntityRouteImport } from './routes/guides/add-entity'
-import { Route as GuidesAddEndpointRouteImport } from './routes/guides/add-endpoint'
+import { Route as DocsIndexRouteImport } from './routes/docs/index'
+import { Route as DocsWelcomeRouteImport } from './routes/docs/welcome'
+import { Route as DocsHandbookRouteImport } from './routes/docs/handbook'
 import { Route as AuthLoginRouteImport } from './routes/auth/login'
 import { Route as PathlessLayoutNestedLayoutRouteImport } from './routes/_pathlessLayout/_nested-layout'
-import { Route as PostsPostIdDeepRouteImport } from './routes/posts_.$postId.deep'
+import { Route as DocsToolsIndexRouteImport } from './routes/docs/tools/index'
+import { Route as DocsReferenceIndexRouteImport } from './routes/docs/reference/index'
+import { Route as DocsLearnIndexRouteImport } from './routes/docs/learn/index'
+import { Route as DocsGuidesIndexRouteImport } from './routes/docs/guides/index'
+import { Route as DocsToolsScaffoldingRouteImport } from './routes/docs/tools/scaffolding'
+import { Route as DocsToolsMonitoringRouteImport } from './routes/docs/tools/monitoring'
+import { Route as DocsToolsApiPlaygroundRouteImport } from './routes/docs/tools/api-playground'
+import { Route as DocsReferenceStandardsRouteImport } from './routes/docs/reference/standards'
+import { Route as DocsReferencePatternsRouteImport } from './routes/docs/reference/patterns'
+import { Route as DocsReferenceConfigRouteImport } from './routes/docs/reference/config'
+import { Route as DocsReferenceApiRouteImport } from './routes/docs/reference/api'
+import { Route as DocsReferenceAdrRouteImport } from './routes/docs/reference/adr'
+import { Route as DocsLearnTestingRouteImport } from './routes/docs/learn/testing'
+import { Route as DocsLearnRestApiRouteImport } from './routes/docs/learn/rest-api'
+import { Route as DocsLearnFrontendRouteImport } from './routes/docs/learn/frontend'
+import { Route as DocsLearnDatabaseRouteImport } from './routes/docs/learn/database'
+import { Route as DocsLearnCachingRouteImport } from './routes/docs/learn/caching'
+import { Route as DocsLearnAuthenticationRouteImport } from './routes/docs/learn/authentication'
+import { Route as DocsLearnArchitectureRouteImport } from './routes/docs/learn/architecture'
+import { Route as DocsGuidesTroubleshootingRouteImport } from './routes/docs/guides/troubleshooting'
+import { Route as DocsGuidesTestingRouteImport } from './routes/docs/guides/testing'
+import { Route as DocsGuidesMigrationsRouteImport } from './routes/docs/guides/migrations'
+import { Route as DocsGuidesGitWorkflowRouteImport } from './routes/docs/guides/git-workflow'
+import { Route as DocsGuidesDeploymentRouteImport } from './routes/docs/guides/deployment'
+import { Route as DocsGuidesCustomizationRouteImport } from './routes/docs/guides/customization'
+import { Route as DocsGuidesAddEntityRouteImport } from './routes/docs/guides/add-entity'
+import { Route as DocsGuidesAddEndpointRouteImport } from './routes/docs/guides/add-endpoint'
 import { Route as PathlessLayoutNestedLayoutRouteBRouteImport } from './routes/_pathlessLayout/_nested-layout/route-b'
 import { Route as PathlessLayoutNestedLayoutRouteARouteImport } from './routes/_pathlessLayout/_nested-layout/route-a'
-import { ServerRoute as CustomScriptDotjsServerRouteImport } from './routes/customScript[.]js'
 import { ServerRoute as ApiUsersServerRouteImport } from './routes/api/users'
 import { ServerRoute as ApiUsersUserIdServerRouteImport } from './routes/api/users.$userId'
 
 const rootServerRouteImport = createServerRootRoute()
 
-const WelcomeRoute = WelcomeRouteImport.update({
-  id: '/welcome',
-  path: '/welcome',
+const DocsRoute = DocsRouteImport.update({
+  id: '/docs',
+  path: '/docs',
   getParentRoute: () => rootRouteImport,
 } as any)
-const UsersRoute = UsersRouteImport.update({
-  id: '/users',
-  path: '/users',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const RedirectRoute = RedirectRouteImport.update({
-  id: '/redirect',
-  path: '/redirect',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PostsRoute = PostsRouteImport.update({
-  id: '/posts',
-  path: '/posts',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const HandbookRoute = HandbookRouteImport.update({
-  id: '/handbook',
-  path: '/handbook',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DeferredRoute = DeferredRouteImport.update({
-  id: '/deferred',
-  path: '/deferred',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PathlessLayoutRoute = PathlessLayoutRouteImport.update({
-  id: '/_pathlessLayout',
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -100,160 +68,20 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const UsersIndexRoute = UsersIndexRouteImport.update({
+const DocsIndexRoute = DocsIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => UsersRoute,
+  getParentRoute: () => DocsRoute,
 } as any)
-const ToolsIndexRoute = ToolsIndexRouteImport.update({
-  id: '/tools/',
-  path: '/tools/',
-  getParentRoute: () => rootRouteImport,
+const DocsWelcomeRoute = DocsWelcomeRouteImport.update({
+  id: '/welcome',
+  path: '/welcome',
+  getParentRoute: () => DocsRoute,
 } as any)
-const ReferenceIndexRoute = ReferenceIndexRouteImport.update({
-  id: '/reference/',
-  path: '/reference/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PostsIndexRoute = PostsIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => PostsRoute,
-} as any)
-const LearnIndexRoute = LearnIndexRouteImport.update({
-  id: '/learn/',
-  path: '/learn/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const GuidesIndexRoute = GuidesIndexRouteImport.update({
-  id: '/guides/',
-  path: '/guides/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const UsersUserIdRoute = UsersUserIdRouteImport.update({
-  id: '/$userId',
-  path: '/$userId',
-  getParentRoute: () => UsersRoute,
-} as any)
-const ToolsScaffoldingRoute = ToolsScaffoldingRouteImport.update({
-  id: '/tools/scaffolding',
-  path: '/tools/scaffolding',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ToolsMonitoringRoute = ToolsMonitoringRouteImport.update({
-  id: '/tools/monitoring',
-  path: '/tools/monitoring',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ToolsApiPlaygroundRoute = ToolsApiPlaygroundRouteImport.update({
-  id: '/tools/api-playground',
-  path: '/tools/api-playground',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ReferenceStandardsRoute = ReferenceStandardsRouteImport.update({
-  id: '/reference/standards',
-  path: '/reference/standards',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ReferencePatternsRoute = ReferencePatternsRouteImport.update({
-  id: '/reference/patterns',
-  path: '/reference/patterns',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ReferenceConfigRoute = ReferenceConfigRouteImport.update({
-  id: '/reference/config',
-  path: '/reference/config',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ReferenceApiRoute = ReferenceApiRouteImport.update({
-  id: '/reference/api',
-  path: '/reference/api',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ReferenceAdrRoute = ReferenceAdrRouteImport.update({
-  id: '/reference/adr',
-  path: '/reference/adr',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PostsPostIdRoute = PostsPostIdRouteImport.update({
-  id: '/$postId',
-  path: '/$postId',
-  getParentRoute: () => PostsRoute,
-} as any)
-const LearnTestingRoute = LearnTestingRouteImport.update({
-  id: '/learn/testing',
-  path: '/learn/testing',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LearnRestApiRoute = LearnRestApiRouteImport.update({
-  id: '/learn/rest-api',
-  path: '/learn/rest-api',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LearnFrontendRoute = LearnFrontendRouteImport.update({
-  id: '/learn/frontend',
-  path: '/learn/frontend',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LearnDatabaseRoute = LearnDatabaseRouteImport.update({
-  id: '/learn/database',
-  path: '/learn/database',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LearnCachingRoute = LearnCachingRouteImport.update({
-  id: '/learn/caching',
-  path: '/learn/caching',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LearnAuthenticationRoute = LearnAuthenticationRouteImport.update({
-  id: '/learn/authentication',
-  path: '/learn/authentication',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LearnArchitectureRoute = LearnArchitectureRouteImport.update({
-  id: '/learn/architecture',
-  path: '/learn/architecture',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const GuidesTroubleshootingRoute = GuidesTroubleshootingRouteImport.update({
-  id: '/guides/troubleshooting',
-  path: '/guides/troubleshooting',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const GuidesTestingRoute = GuidesTestingRouteImport.update({
-  id: '/guides/testing',
-  path: '/guides/testing',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const GuidesMigrationsRoute = GuidesMigrationsRouteImport.update({
-  id: '/guides/migrations',
-  path: '/guides/migrations',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const GuidesGitWorkflowRoute = GuidesGitWorkflowRouteImport.update({
-  id: '/guides/git-workflow',
-  path: '/guides/git-workflow',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const GuidesDeploymentRoute = GuidesDeploymentRouteImport.update({
-  id: '/guides/deployment',
-  path: '/guides/deployment',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const GuidesCustomizationRoute = GuidesCustomizationRouteImport.update({
-  id: '/guides/customization',
-  path: '/guides/customization',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const GuidesAddEntityRoute = GuidesAddEntityRouteImport.update({
-  id: '/guides/add-entity',
-  path: '/guides/add-entity',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const GuidesAddEndpointRoute = GuidesAddEndpointRouteImport.update({
-  id: '/guides/add-endpoint',
-  path: '/guides/add-endpoint',
-  getParentRoute: () => rootRouteImport,
+const DocsHandbookRoute = DocsHandbookRouteImport.update({
+  id: '/handbook',
+  path: '/handbook',
+  getParentRoute: () => DocsRoute,
 } as any)
 const AuthLoginRoute = AuthLoginRouteImport.update({
   id: '/auth/login',
@@ -262,13 +90,144 @@ const AuthLoginRoute = AuthLoginRouteImport.update({
 } as any)
 const PathlessLayoutNestedLayoutRoute =
   PathlessLayoutNestedLayoutRouteImport.update({
-    id: '/_nested-layout',
-    getParentRoute: () => PathlessLayoutRoute,
+    id: '/_pathlessLayout/_nested-layout',
+    getParentRoute: () => rootRouteImport,
   } as any)
-const PostsPostIdDeepRoute = PostsPostIdDeepRouteImport.update({
-  id: '/posts_/$postId/deep',
-  path: '/posts/$postId/deep',
-  getParentRoute: () => rootRouteImport,
+const DocsToolsIndexRoute = DocsToolsIndexRouteImport.update({
+  id: '/tools/',
+  path: '/tools/',
+  getParentRoute: () => DocsRoute,
+} as any)
+const DocsReferenceIndexRoute = DocsReferenceIndexRouteImport.update({
+  id: '/reference/',
+  path: '/reference/',
+  getParentRoute: () => DocsRoute,
+} as any)
+const DocsLearnIndexRoute = DocsLearnIndexRouteImport.update({
+  id: '/learn/',
+  path: '/learn/',
+  getParentRoute: () => DocsRoute,
+} as any)
+const DocsGuidesIndexRoute = DocsGuidesIndexRouteImport.update({
+  id: '/guides/',
+  path: '/guides/',
+  getParentRoute: () => DocsRoute,
+} as any)
+const DocsToolsScaffoldingRoute = DocsToolsScaffoldingRouteImport.update({
+  id: '/tools/scaffolding',
+  path: '/tools/scaffolding',
+  getParentRoute: () => DocsRoute,
+} as any)
+const DocsToolsMonitoringRoute = DocsToolsMonitoringRouteImport.update({
+  id: '/tools/monitoring',
+  path: '/tools/monitoring',
+  getParentRoute: () => DocsRoute,
+} as any)
+const DocsToolsApiPlaygroundRoute = DocsToolsApiPlaygroundRouteImport.update({
+  id: '/tools/api-playground',
+  path: '/tools/api-playground',
+  getParentRoute: () => DocsRoute,
+} as any)
+const DocsReferenceStandardsRoute = DocsReferenceStandardsRouteImport.update({
+  id: '/reference/standards',
+  path: '/reference/standards',
+  getParentRoute: () => DocsRoute,
+} as any)
+const DocsReferencePatternsRoute = DocsReferencePatternsRouteImport.update({
+  id: '/reference/patterns',
+  path: '/reference/patterns',
+  getParentRoute: () => DocsRoute,
+} as any)
+const DocsReferenceConfigRoute = DocsReferenceConfigRouteImport.update({
+  id: '/reference/config',
+  path: '/reference/config',
+  getParentRoute: () => DocsRoute,
+} as any)
+const DocsReferenceApiRoute = DocsReferenceApiRouteImport.update({
+  id: '/reference/api',
+  path: '/reference/api',
+  getParentRoute: () => DocsRoute,
+} as any)
+const DocsReferenceAdrRoute = DocsReferenceAdrRouteImport.update({
+  id: '/reference/adr',
+  path: '/reference/adr',
+  getParentRoute: () => DocsRoute,
+} as any)
+const DocsLearnTestingRoute = DocsLearnTestingRouteImport.update({
+  id: '/learn/testing',
+  path: '/learn/testing',
+  getParentRoute: () => DocsRoute,
+} as any)
+const DocsLearnRestApiRoute = DocsLearnRestApiRouteImport.update({
+  id: '/learn/rest-api',
+  path: '/learn/rest-api',
+  getParentRoute: () => DocsRoute,
+} as any)
+const DocsLearnFrontendRoute = DocsLearnFrontendRouteImport.update({
+  id: '/learn/frontend',
+  path: '/learn/frontend',
+  getParentRoute: () => DocsRoute,
+} as any)
+const DocsLearnDatabaseRoute = DocsLearnDatabaseRouteImport.update({
+  id: '/learn/database',
+  path: '/learn/database',
+  getParentRoute: () => DocsRoute,
+} as any)
+const DocsLearnCachingRoute = DocsLearnCachingRouteImport.update({
+  id: '/learn/caching',
+  path: '/learn/caching',
+  getParentRoute: () => DocsRoute,
+} as any)
+const DocsLearnAuthenticationRoute = DocsLearnAuthenticationRouteImport.update({
+  id: '/learn/authentication',
+  path: '/learn/authentication',
+  getParentRoute: () => DocsRoute,
+} as any)
+const DocsLearnArchitectureRoute = DocsLearnArchitectureRouteImport.update({
+  id: '/learn/architecture',
+  path: '/learn/architecture',
+  getParentRoute: () => DocsRoute,
+} as any)
+const DocsGuidesTroubleshootingRoute =
+  DocsGuidesTroubleshootingRouteImport.update({
+    id: '/guides/troubleshooting',
+    path: '/guides/troubleshooting',
+    getParentRoute: () => DocsRoute,
+  } as any)
+const DocsGuidesTestingRoute = DocsGuidesTestingRouteImport.update({
+  id: '/guides/testing',
+  path: '/guides/testing',
+  getParentRoute: () => DocsRoute,
+} as any)
+const DocsGuidesMigrationsRoute = DocsGuidesMigrationsRouteImport.update({
+  id: '/guides/migrations',
+  path: '/guides/migrations',
+  getParentRoute: () => DocsRoute,
+} as any)
+const DocsGuidesGitWorkflowRoute = DocsGuidesGitWorkflowRouteImport.update({
+  id: '/guides/git-workflow',
+  path: '/guides/git-workflow',
+  getParentRoute: () => DocsRoute,
+} as any)
+const DocsGuidesDeploymentRoute = DocsGuidesDeploymentRouteImport.update({
+  id: '/guides/deployment',
+  path: '/guides/deployment',
+  getParentRoute: () => DocsRoute,
+} as any)
+const DocsGuidesCustomizationRoute = DocsGuidesCustomizationRouteImport.update({
+  id: '/guides/customization',
+  path: '/guides/customization',
+  getParentRoute: () => DocsRoute,
+} as any)
+const DocsGuidesAddEntityRoute = DocsGuidesAddEntityRouteImport.update({
+  id: '/guides/add-entity',
+  path: '/guides/add-entity',
+  getParentRoute: () => DocsRoute,
+} as any)
+const DocsGuidesAddEndpointRoute = DocsGuidesAddEndpointRouteImport.update({
+  id: '/guides/add-endpoint',
+  path: '/guides/add-endpoint',
+  getParentRoute: () => DocsRoute,
 } as any)
 const PathlessLayoutNestedLayoutRouteBRoute =
   PathlessLayoutNestedLayoutRouteBRouteImport.update({
@@ -282,11 +241,6 @@ const PathlessLayoutNestedLayoutRouteARoute =
     path: '/route-a',
     getParentRoute: () => PathlessLayoutNestedLayoutRoute,
   } as any)
-const CustomScriptDotjsServerRoute = CustomScriptDotjsServerRouteImport.update({
-  id: '/customScript.js',
-  path: '/customScript.js',
-  getParentRoute: () => rootServerRouteImport,
-} as any)
 const ApiUsersServerRoute = ApiUsersServerRouteImport.update({
   id: '/api/users',
   path: '/api/users',
@@ -300,389 +254,282 @@ const ApiUsersUserIdServerRoute = ApiUsersUserIdServerRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/deferred': typeof DeferredRoute
-  '/handbook': typeof HandbookRoute
-  '/posts': typeof PostsRouteWithChildren
-  '/redirect': typeof RedirectRoute
-  '/users': typeof UsersRouteWithChildren
-  '/welcome': typeof WelcomeRoute
+  '/dashboard': typeof DashboardRoute
+  '/docs': typeof DocsRouteWithChildren
   '/auth/login': typeof AuthLoginRoute
-  '/guides/add-endpoint': typeof GuidesAddEndpointRoute
-  '/guides/add-entity': typeof GuidesAddEntityRoute
-  '/guides/customization': typeof GuidesCustomizationRoute
-  '/guides/deployment': typeof GuidesDeploymentRoute
-  '/guides/git-workflow': typeof GuidesGitWorkflowRoute
-  '/guides/migrations': typeof GuidesMigrationsRoute
-  '/guides/testing': typeof GuidesTestingRoute
-  '/guides/troubleshooting': typeof GuidesTroubleshootingRoute
-  '/learn/architecture': typeof LearnArchitectureRoute
-  '/learn/authentication': typeof LearnAuthenticationRoute
-  '/learn/caching': typeof LearnCachingRoute
-  '/learn/database': typeof LearnDatabaseRoute
-  '/learn/frontend': typeof LearnFrontendRoute
-  '/learn/rest-api': typeof LearnRestApiRoute
-  '/learn/testing': typeof LearnTestingRoute
-  '/posts/$postId': typeof PostsPostIdRoute
-  '/reference/adr': typeof ReferenceAdrRoute
-  '/reference/api': typeof ReferenceApiRoute
-  '/reference/config': typeof ReferenceConfigRoute
-  '/reference/patterns': typeof ReferencePatternsRoute
-  '/reference/standards': typeof ReferenceStandardsRoute
-  '/tools/api-playground': typeof ToolsApiPlaygroundRoute
-  '/tools/monitoring': typeof ToolsMonitoringRoute
-  '/tools/scaffolding': typeof ToolsScaffoldingRoute
-  '/users/$userId': typeof UsersUserIdRoute
-  '/guides': typeof GuidesIndexRoute
-  '/learn': typeof LearnIndexRoute
-  '/posts/': typeof PostsIndexRoute
-  '/reference': typeof ReferenceIndexRoute
-  '/tools': typeof ToolsIndexRoute
-  '/users/': typeof UsersIndexRoute
+  '/docs/handbook': typeof DocsHandbookRoute
+  '/docs/welcome': typeof DocsWelcomeRoute
+  '/docs/': typeof DocsIndexRoute
   '/route-a': typeof PathlessLayoutNestedLayoutRouteARoute
   '/route-b': typeof PathlessLayoutNestedLayoutRouteBRoute
-  '/posts/$postId/deep': typeof PostsPostIdDeepRoute
+  '/docs/guides/add-endpoint': typeof DocsGuidesAddEndpointRoute
+  '/docs/guides/add-entity': typeof DocsGuidesAddEntityRoute
+  '/docs/guides/customization': typeof DocsGuidesCustomizationRoute
+  '/docs/guides/deployment': typeof DocsGuidesDeploymentRoute
+  '/docs/guides/git-workflow': typeof DocsGuidesGitWorkflowRoute
+  '/docs/guides/migrations': typeof DocsGuidesMigrationsRoute
+  '/docs/guides/testing': typeof DocsGuidesTestingRoute
+  '/docs/guides/troubleshooting': typeof DocsGuidesTroubleshootingRoute
+  '/docs/learn/architecture': typeof DocsLearnArchitectureRoute
+  '/docs/learn/authentication': typeof DocsLearnAuthenticationRoute
+  '/docs/learn/caching': typeof DocsLearnCachingRoute
+  '/docs/learn/database': typeof DocsLearnDatabaseRoute
+  '/docs/learn/frontend': typeof DocsLearnFrontendRoute
+  '/docs/learn/rest-api': typeof DocsLearnRestApiRoute
+  '/docs/learn/testing': typeof DocsLearnTestingRoute
+  '/docs/reference/adr': typeof DocsReferenceAdrRoute
+  '/docs/reference/api': typeof DocsReferenceApiRoute
+  '/docs/reference/config': typeof DocsReferenceConfigRoute
+  '/docs/reference/patterns': typeof DocsReferencePatternsRoute
+  '/docs/reference/standards': typeof DocsReferenceStandardsRoute
+  '/docs/tools/api-playground': typeof DocsToolsApiPlaygroundRoute
+  '/docs/tools/monitoring': typeof DocsToolsMonitoringRoute
+  '/docs/tools/scaffolding': typeof DocsToolsScaffoldingRoute
+  '/docs/guides': typeof DocsGuidesIndexRoute
+  '/docs/learn': typeof DocsLearnIndexRoute
+  '/docs/reference': typeof DocsReferenceIndexRoute
+  '/docs/tools': typeof DocsToolsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/deferred': typeof DeferredRoute
-  '/handbook': typeof HandbookRoute
-  '/redirect': typeof RedirectRoute
-  '/welcome': typeof WelcomeRoute
+  '/dashboard': typeof DashboardRoute
   '/auth/login': typeof AuthLoginRoute
-  '/guides/add-endpoint': typeof GuidesAddEndpointRoute
-  '/guides/add-entity': typeof GuidesAddEntityRoute
-  '/guides/customization': typeof GuidesCustomizationRoute
-  '/guides/deployment': typeof GuidesDeploymentRoute
-  '/guides/git-workflow': typeof GuidesGitWorkflowRoute
-  '/guides/migrations': typeof GuidesMigrationsRoute
-  '/guides/testing': typeof GuidesTestingRoute
-  '/guides/troubleshooting': typeof GuidesTroubleshootingRoute
-  '/learn/architecture': typeof LearnArchitectureRoute
-  '/learn/authentication': typeof LearnAuthenticationRoute
-  '/learn/caching': typeof LearnCachingRoute
-  '/learn/database': typeof LearnDatabaseRoute
-  '/learn/frontend': typeof LearnFrontendRoute
-  '/learn/rest-api': typeof LearnRestApiRoute
-  '/learn/testing': typeof LearnTestingRoute
-  '/posts/$postId': typeof PostsPostIdRoute
-  '/reference/adr': typeof ReferenceAdrRoute
-  '/reference/api': typeof ReferenceApiRoute
-  '/reference/config': typeof ReferenceConfigRoute
-  '/reference/patterns': typeof ReferencePatternsRoute
-  '/reference/standards': typeof ReferenceStandardsRoute
-  '/tools/api-playground': typeof ToolsApiPlaygroundRoute
-  '/tools/monitoring': typeof ToolsMonitoringRoute
-  '/tools/scaffolding': typeof ToolsScaffoldingRoute
-  '/users/$userId': typeof UsersUserIdRoute
-  '/guides': typeof GuidesIndexRoute
-  '/learn': typeof LearnIndexRoute
-  '/posts': typeof PostsIndexRoute
-  '/reference': typeof ReferenceIndexRoute
-  '/tools': typeof ToolsIndexRoute
-  '/users': typeof UsersIndexRoute
+  '/docs/handbook': typeof DocsHandbookRoute
+  '/docs/welcome': typeof DocsWelcomeRoute
+  '/docs': typeof DocsIndexRoute
   '/route-a': typeof PathlessLayoutNestedLayoutRouteARoute
   '/route-b': typeof PathlessLayoutNestedLayoutRouteBRoute
-  '/posts/$postId/deep': typeof PostsPostIdDeepRoute
+  '/docs/guides/add-endpoint': typeof DocsGuidesAddEndpointRoute
+  '/docs/guides/add-entity': typeof DocsGuidesAddEntityRoute
+  '/docs/guides/customization': typeof DocsGuidesCustomizationRoute
+  '/docs/guides/deployment': typeof DocsGuidesDeploymentRoute
+  '/docs/guides/git-workflow': typeof DocsGuidesGitWorkflowRoute
+  '/docs/guides/migrations': typeof DocsGuidesMigrationsRoute
+  '/docs/guides/testing': typeof DocsGuidesTestingRoute
+  '/docs/guides/troubleshooting': typeof DocsGuidesTroubleshootingRoute
+  '/docs/learn/architecture': typeof DocsLearnArchitectureRoute
+  '/docs/learn/authentication': typeof DocsLearnAuthenticationRoute
+  '/docs/learn/caching': typeof DocsLearnCachingRoute
+  '/docs/learn/database': typeof DocsLearnDatabaseRoute
+  '/docs/learn/frontend': typeof DocsLearnFrontendRoute
+  '/docs/learn/rest-api': typeof DocsLearnRestApiRoute
+  '/docs/learn/testing': typeof DocsLearnTestingRoute
+  '/docs/reference/adr': typeof DocsReferenceAdrRoute
+  '/docs/reference/api': typeof DocsReferenceApiRoute
+  '/docs/reference/config': typeof DocsReferenceConfigRoute
+  '/docs/reference/patterns': typeof DocsReferencePatternsRoute
+  '/docs/reference/standards': typeof DocsReferenceStandardsRoute
+  '/docs/tools/api-playground': typeof DocsToolsApiPlaygroundRoute
+  '/docs/tools/monitoring': typeof DocsToolsMonitoringRoute
+  '/docs/tools/scaffolding': typeof DocsToolsScaffoldingRoute
+  '/docs/guides': typeof DocsGuidesIndexRoute
+  '/docs/learn': typeof DocsLearnIndexRoute
+  '/docs/reference': typeof DocsReferenceIndexRoute
+  '/docs/tools': typeof DocsToolsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/_pathlessLayout': typeof PathlessLayoutRouteWithChildren
-  '/deferred': typeof DeferredRoute
-  '/handbook': typeof HandbookRoute
-  '/posts': typeof PostsRouteWithChildren
-  '/redirect': typeof RedirectRoute
-  '/users': typeof UsersRouteWithChildren
-  '/welcome': typeof WelcomeRoute
+  '/dashboard': typeof DashboardRoute
+  '/docs': typeof DocsRouteWithChildren
   '/_pathlessLayout/_nested-layout': typeof PathlessLayoutNestedLayoutRouteWithChildren
   '/auth/login': typeof AuthLoginRoute
-  '/guides/add-endpoint': typeof GuidesAddEndpointRoute
-  '/guides/add-entity': typeof GuidesAddEntityRoute
-  '/guides/customization': typeof GuidesCustomizationRoute
-  '/guides/deployment': typeof GuidesDeploymentRoute
-  '/guides/git-workflow': typeof GuidesGitWorkflowRoute
-  '/guides/migrations': typeof GuidesMigrationsRoute
-  '/guides/testing': typeof GuidesTestingRoute
-  '/guides/troubleshooting': typeof GuidesTroubleshootingRoute
-  '/learn/architecture': typeof LearnArchitectureRoute
-  '/learn/authentication': typeof LearnAuthenticationRoute
-  '/learn/caching': typeof LearnCachingRoute
-  '/learn/database': typeof LearnDatabaseRoute
-  '/learn/frontend': typeof LearnFrontendRoute
-  '/learn/rest-api': typeof LearnRestApiRoute
-  '/learn/testing': typeof LearnTestingRoute
-  '/posts/$postId': typeof PostsPostIdRoute
-  '/reference/adr': typeof ReferenceAdrRoute
-  '/reference/api': typeof ReferenceApiRoute
-  '/reference/config': typeof ReferenceConfigRoute
-  '/reference/patterns': typeof ReferencePatternsRoute
-  '/reference/standards': typeof ReferenceStandardsRoute
-  '/tools/api-playground': typeof ToolsApiPlaygroundRoute
-  '/tools/monitoring': typeof ToolsMonitoringRoute
-  '/tools/scaffolding': typeof ToolsScaffoldingRoute
-  '/users/$userId': typeof UsersUserIdRoute
-  '/guides/': typeof GuidesIndexRoute
-  '/learn/': typeof LearnIndexRoute
-  '/posts/': typeof PostsIndexRoute
-  '/reference/': typeof ReferenceIndexRoute
-  '/tools/': typeof ToolsIndexRoute
-  '/users/': typeof UsersIndexRoute
+  '/docs/handbook': typeof DocsHandbookRoute
+  '/docs/welcome': typeof DocsWelcomeRoute
+  '/docs/': typeof DocsIndexRoute
   '/_pathlessLayout/_nested-layout/route-a': typeof PathlessLayoutNestedLayoutRouteARoute
   '/_pathlessLayout/_nested-layout/route-b': typeof PathlessLayoutNestedLayoutRouteBRoute
-  '/posts_/$postId/deep': typeof PostsPostIdDeepRoute
+  '/docs/guides/add-endpoint': typeof DocsGuidesAddEndpointRoute
+  '/docs/guides/add-entity': typeof DocsGuidesAddEntityRoute
+  '/docs/guides/customization': typeof DocsGuidesCustomizationRoute
+  '/docs/guides/deployment': typeof DocsGuidesDeploymentRoute
+  '/docs/guides/git-workflow': typeof DocsGuidesGitWorkflowRoute
+  '/docs/guides/migrations': typeof DocsGuidesMigrationsRoute
+  '/docs/guides/testing': typeof DocsGuidesTestingRoute
+  '/docs/guides/troubleshooting': typeof DocsGuidesTroubleshootingRoute
+  '/docs/learn/architecture': typeof DocsLearnArchitectureRoute
+  '/docs/learn/authentication': typeof DocsLearnAuthenticationRoute
+  '/docs/learn/caching': typeof DocsLearnCachingRoute
+  '/docs/learn/database': typeof DocsLearnDatabaseRoute
+  '/docs/learn/frontend': typeof DocsLearnFrontendRoute
+  '/docs/learn/rest-api': typeof DocsLearnRestApiRoute
+  '/docs/learn/testing': typeof DocsLearnTestingRoute
+  '/docs/reference/adr': typeof DocsReferenceAdrRoute
+  '/docs/reference/api': typeof DocsReferenceApiRoute
+  '/docs/reference/config': typeof DocsReferenceConfigRoute
+  '/docs/reference/patterns': typeof DocsReferencePatternsRoute
+  '/docs/reference/standards': typeof DocsReferenceStandardsRoute
+  '/docs/tools/api-playground': typeof DocsToolsApiPlaygroundRoute
+  '/docs/tools/monitoring': typeof DocsToolsMonitoringRoute
+  '/docs/tools/scaffolding': typeof DocsToolsScaffoldingRoute
+  '/docs/guides/': typeof DocsGuidesIndexRoute
+  '/docs/learn/': typeof DocsLearnIndexRoute
+  '/docs/reference/': typeof DocsReferenceIndexRoute
+  '/docs/tools/': typeof DocsToolsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/deferred'
-    | '/handbook'
-    | '/posts'
-    | '/redirect'
-    | '/users'
-    | '/welcome'
+    | '/dashboard'
+    | '/docs'
     | '/auth/login'
-    | '/guides/add-endpoint'
-    | '/guides/add-entity'
-    | '/guides/customization'
-    | '/guides/deployment'
-    | '/guides/git-workflow'
-    | '/guides/migrations'
-    | '/guides/testing'
-    | '/guides/troubleshooting'
-    | '/learn/architecture'
-    | '/learn/authentication'
-    | '/learn/caching'
-    | '/learn/database'
-    | '/learn/frontend'
-    | '/learn/rest-api'
-    | '/learn/testing'
-    | '/posts/$postId'
-    | '/reference/adr'
-    | '/reference/api'
-    | '/reference/config'
-    | '/reference/patterns'
-    | '/reference/standards'
-    | '/tools/api-playground'
-    | '/tools/monitoring'
-    | '/tools/scaffolding'
-    | '/users/$userId'
-    | '/guides'
-    | '/learn'
-    | '/posts/'
-    | '/reference'
-    | '/tools'
-    | '/users/'
+    | '/docs/handbook'
+    | '/docs/welcome'
+    | '/docs/'
     | '/route-a'
     | '/route-b'
-    | '/posts/$postId/deep'
+    | '/docs/guides/add-endpoint'
+    | '/docs/guides/add-entity'
+    | '/docs/guides/customization'
+    | '/docs/guides/deployment'
+    | '/docs/guides/git-workflow'
+    | '/docs/guides/migrations'
+    | '/docs/guides/testing'
+    | '/docs/guides/troubleshooting'
+    | '/docs/learn/architecture'
+    | '/docs/learn/authentication'
+    | '/docs/learn/caching'
+    | '/docs/learn/database'
+    | '/docs/learn/frontend'
+    | '/docs/learn/rest-api'
+    | '/docs/learn/testing'
+    | '/docs/reference/adr'
+    | '/docs/reference/api'
+    | '/docs/reference/config'
+    | '/docs/reference/patterns'
+    | '/docs/reference/standards'
+    | '/docs/tools/api-playground'
+    | '/docs/tools/monitoring'
+    | '/docs/tools/scaffolding'
+    | '/docs/guides'
+    | '/docs/learn'
+    | '/docs/reference'
+    | '/docs/tools'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/deferred'
-    | '/handbook'
-    | '/redirect'
-    | '/welcome'
+    | '/dashboard'
     | '/auth/login'
-    | '/guides/add-endpoint'
-    | '/guides/add-entity'
-    | '/guides/customization'
-    | '/guides/deployment'
-    | '/guides/git-workflow'
-    | '/guides/migrations'
-    | '/guides/testing'
-    | '/guides/troubleshooting'
-    | '/learn/architecture'
-    | '/learn/authentication'
-    | '/learn/caching'
-    | '/learn/database'
-    | '/learn/frontend'
-    | '/learn/rest-api'
-    | '/learn/testing'
-    | '/posts/$postId'
-    | '/reference/adr'
-    | '/reference/api'
-    | '/reference/config'
-    | '/reference/patterns'
-    | '/reference/standards'
-    | '/tools/api-playground'
-    | '/tools/monitoring'
-    | '/tools/scaffolding'
-    | '/users/$userId'
-    | '/guides'
-    | '/learn'
-    | '/posts'
-    | '/reference'
-    | '/tools'
-    | '/users'
+    | '/docs/handbook'
+    | '/docs/welcome'
+    | '/docs'
     | '/route-a'
     | '/route-b'
-    | '/posts/$postId/deep'
+    | '/docs/guides/add-endpoint'
+    | '/docs/guides/add-entity'
+    | '/docs/guides/customization'
+    | '/docs/guides/deployment'
+    | '/docs/guides/git-workflow'
+    | '/docs/guides/migrations'
+    | '/docs/guides/testing'
+    | '/docs/guides/troubleshooting'
+    | '/docs/learn/architecture'
+    | '/docs/learn/authentication'
+    | '/docs/learn/caching'
+    | '/docs/learn/database'
+    | '/docs/learn/frontend'
+    | '/docs/learn/rest-api'
+    | '/docs/learn/testing'
+    | '/docs/reference/adr'
+    | '/docs/reference/api'
+    | '/docs/reference/config'
+    | '/docs/reference/patterns'
+    | '/docs/reference/standards'
+    | '/docs/tools/api-playground'
+    | '/docs/tools/monitoring'
+    | '/docs/tools/scaffolding'
+    | '/docs/guides'
+    | '/docs/learn'
+    | '/docs/reference'
+    | '/docs/tools'
   id:
     | '__root__'
     | '/'
-    | '/_pathlessLayout'
-    | '/deferred'
-    | '/handbook'
-    | '/posts'
-    | '/redirect'
-    | '/users'
-    | '/welcome'
+    | '/dashboard'
+    | '/docs'
     | '/_pathlessLayout/_nested-layout'
     | '/auth/login'
-    | '/guides/add-endpoint'
-    | '/guides/add-entity'
-    | '/guides/customization'
-    | '/guides/deployment'
-    | '/guides/git-workflow'
-    | '/guides/migrations'
-    | '/guides/testing'
-    | '/guides/troubleshooting'
-    | '/learn/architecture'
-    | '/learn/authentication'
-    | '/learn/caching'
-    | '/learn/database'
-    | '/learn/frontend'
-    | '/learn/rest-api'
-    | '/learn/testing'
-    | '/posts/$postId'
-    | '/reference/adr'
-    | '/reference/api'
-    | '/reference/config'
-    | '/reference/patterns'
-    | '/reference/standards'
-    | '/tools/api-playground'
-    | '/tools/monitoring'
-    | '/tools/scaffolding'
-    | '/users/$userId'
-    | '/guides/'
-    | '/learn/'
-    | '/posts/'
-    | '/reference/'
-    | '/tools/'
-    | '/users/'
+    | '/docs/handbook'
+    | '/docs/welcome'
+    | '/docs/'
     | '/_pathlessLayout/_nested-layout/route-a'
     | '/_pathlessLayout/_nested-layout/route-b'
-    | '/posts_/$postId/deep'
+    | '/docs/guides/add-endpoint'
+    | '/docs/guides/add-entity'
+    | '/docs/guides/customization'
+    | '/docs/guides/deployment'
+    | '/docs/guides/git-workflow'
+    | '/docs/guides/migrations'
+    | '/docs/guides/testing'
+    | '/docs/guides/troubleshooting'
+    | '/docs/learn/architecture'
+    | '/docs/learn/authentication'
+    | '/docs/learn/caching'
+    | '/docs/learn/database'
+    | '/docs/learn/frontend'
+    | '/docs/learn/rest-api'
+    | '/docs/learn/testing'
+    | '/docs/reference/adr'
+    | '/docs/reference/api'
+    | '/docs/reference/config'
+    | '/docs/reference/patterns'
+    | '/docs/reference/standards'
+    | '/docs/tools/api-playground'
+    | '/docs/tools/monitoring'
+    | '/docs/tools/scaffolding'
+    | '/docs/guides/'
+    | '/docs/learn/'
+    | '/docs/reference/'
+    | '/docs/tools/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  PathlessLayoutRoute: typeof PathlessLayoutRouteWithChildren
-  DeferredRoute: typeof DeferredRoute
-  HandbookRoute: typeof HandbookRoute
-  PostsRoute: typeof PostsRouteWithChildren
-  RedirectRoute: typeof RedirectRoute
-  UsersRoute: typeof UsersRouteWithChildren
-  WelcomeRoute: typeof WelcomeRoute
+  DashboardRoute: typeof DashboardRoute
+  DocsRoute: typeof DocsRouteWithChildren
+  PathlessLayoutNestedLayoutRoute: typeof PathlessLayoutNestedLayoutRouteWithChildren
   AuthLoginRoute: typeof AuthLoginRoute
-  GuidesAddEndpointRoute: typeof GuidesAddEndpointRoute
-  GuidesAddEntityRoute: typeof GuidesAddEntityRoute
-  GuidesCustomizationRoute: typeof GuidesCustomizationRoute
-  GuidesDeploymentRoute: typeof GuidesDeploymentRoute
-  GuidesGitWorkflowRoute: typeof GuidesGitWorkflowRoute
-  GuidesMigrationsRoute: typeof GuidesMigrationsRoute
-  GuidesTestingRoute: typeof GuidesTestingRoute
-  GuidesTroubleshootingRoute: typeof GuidesTroubleshootingRoute
-  LearnArchitectureRoute: typeof LearnArchitectureRoute
-  LearnAuthenticationRoute: typeof LearnAuthenticationRoute
-  LearnCachingRoute: typeof LearnCachingRoute
-  LearnDatabaseRoute: typeof LearnDatabaseRoute
-  LearnFrontendRoute: typeof LearnFrontendRoute
-  LearnRestApiRoute: typeof LearnRestApiRoute
-  LearnTestingRoute: typeof LearnTestingRoute
-  ReferenceAdrRoute: typeof ReferenceAdrRoute
-  ReferenceApiRoute: typeof ReferenceApiRoute
-  ReferenceConfigRoute: typeof ReferenceConfigRoute
-  ReferencePatternsRoute: typeof ReferencePatternsRoute
-  ReferenceStandardsRoute: typeof ReferenceStandardsRoute
-  ToolsApiPlaygroundRoute: typeof ToolsApiPlaygroundRoute
-  ToolsMonitoringRoute: typeof ToolsMonitoringRoute
-  ToolsScaffoldingRoute: typeof ToolsScaffoldingRoute
-  GuidesIndexRoute: typeof GuidesIndexRoute
-  LearnIndexRoute: typeof LearnIndexRoute
-  ReferenceIndexRoute: typeof ReferenceIndexRoute
-  ToolsIndexRoute: typeof ToolsIndexRoute
-  PostsPostIdDeepRoute: typeof PostsPostIdDeepRoute
 }
 export interface FileServerRoutesByFullPath {
-  '/customScript.js': typeof CustomScriptDotjsServerRoute
   '/api/users': typeof ApiUsersServerRouteWithChildren
   '/api/users/$userId': typeof ApiUsersUserIdServerRoute
 }
 export interface FileServerRoutesByTo {
-  '/customScript.js': typeof CustomScriptDotjsServerRoute
   '/api/users': typeof ApiUsersServerRouteWithChildren
   '/api/users/$userId': typeof ApiUsersUserIdServerRoute
 }
 export interface FileServerRoutesById {
   __root__: typeof rootServerRouteImport
-  '/customScript.js': typeof CustomScriptDotjsServerRoute
   '/api/users': typeof ApiUsersServerRouteWithChildren
   '/api/users/$userId': typeof ApiUsersUserIdServerRoute
 }
 export interface FileServerRouteTypes {
   fileServerRoutesByFullPath: FileServerRoutesByFullPath
-  fullPaths: '/customScript.js' | '/api/users' | '/api/users/$userId'
+  fullPaths: '/api/users' | '/api/users/$userId'
   fileServerRoutesByTo: FileServerRoutesByTo
-  to: '/customScript.js' | '/api/users' | '/api/users/$userId'
-  id: '__root__' | '/customScript.js' | '/api/users' | '/api/users/$userId'
+  to: '/api/users' | '/api/users/$userId'
+  id: '__root__' | '/api/users' | '/api/users/$userId'
   fileServerRoutesById: FileServerRoutesById
 }
 export interface RootServerRouteChildren {
-  CustomScriptDotjsServerRoute: typeof CustomScriptDotjsServerRoute
   ApiUsersServerRoute: typeof ApiUsersServerRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/welcome': {
-      id: '/welcome'
-      path: '/welcome'
-      fullPath: '/welcome'
-      preLoaderRoute: typeof WelcomeRouteImport
+    '/docs': {
+      id: '/docs'
+      path: '/docs'
+      fullPath: '/docs'
+      preLoaderRoute: typeof DocsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/users': {
-      id: '/users'
-      path: '/users'
-      fullPath: '/users'
-      preLoaderRoute: typeof UsersRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/redirect': {
-      id: '/redirect'
-      path: '/redirect'
-      fullPath: '/redirect'
-      preLoaderRoute: typeof RedirectRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/posts': {
-      id: '/posts'
-      path: '/posts'
-      fullPath: '/posts'
-      preLoaderRoute: typeof PostsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/handbook': {
-      id: '/handbook'
-      path: '/handbook'
-      fullPath: '/handbook'
-      preLoaderRoute: typeof HandbookRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/deferred': {
-      id: '/deferred'
-      path: '/deferred'
-      fullPath: '/deferred'
-      preLoaderRoute: typeof DeferredRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_pathlessLayout': {
-      id: '/_pathlessLayout'
-      path: ''
-      fullPath: ''
-      preLoaderRoute: typeof PathlessLayoutRouteImport
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -692,222 +539,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/users/': {
-      id: '/users/'
+    '/docs/': {
+      id: '/docs/'
       path: '/'
-      fullPath: '/users/'
-      preLoaderRoute: typeof UsersIndexRouteImport
-      parentRoute: typeof UsersRoute
+      fullPath: '/docs/'
+      preLoaderRoute: typeof DocsIndexRouteImport
+      parentRoute: typeof DocsRoute
     }
-    '/tools/': {
-      id: '/tools/'
-      path: '/tools'
-      fullPath: '/tools'
-      preLoaderRoute: typeof ToolsIndexRouteImport
-      parentRoute: typeof rootRouteImport
+    '/docs/welcome': {
+      id: '/docs/welcome'
+      path: '/welcome'
+      fullPath: '/docs/welcome'
+      preLoaderRoute: typeof DocsWelcomeRouteImport
+      parentRoute: typeof DocsRoute
     }
-    '/reference/': {
-      id: '/reference/'
-      path: '/reference'
-      fullPath: '/reference'
-      preLoaderRoute: typeof ReferenceIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/posts/': {
-      id: '/posts/'
-      path: '/'
-      fullPath: '/posts/'
-      preLoaderRoute: typeof PostsIndexRouteImport
-      parentRoute: typeof PostsRoute
-    }
-    '/learn/': {
-      id: '/learn/'
-      path: '/learn'
-      fullPath: '/learn'
-      preLoaderRoute: typeof LearnIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/guides/': {
-      id: '/guides/'
-      path: '/guides'
-      fullPath: '/guides'
-      preLoaderRoute: typeof GuidesIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/users/$userId': {
-      id: '/users/$userId'
-      path: '/$userId'
-      fullPath: '/users/$userId'
-      preLoaderRoute: typeof UsersUserIdRouteImport
-      parentRoute: typeof UsersRoute
-    }
-    '/tools/scaffolding': {
-      id: '/tools/scaffolding'
-      path: '/tools/scaffolding'
-      fullPath: '/tools/scaffolding'
-      preLoaderRoute: typeof ToolsScaffoldingRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/tools/monitoring': {
-      id: '/tools/monitoring'
-      path: '/tools/monitoring'
-      fullPath: '/tools/monitoring'
-      preLoaderRoute: typeof ToolsMonitoringRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/tools/api-playground': {
-      id: '/tools/api-playground'
-      path: '/tools/api-playground'
-      fullPath: '/tools/api-playground'
-      preLoaderRoute: typeof ToolsApiPlaygroundRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/reference/standards': {
-      id: '/reference/standards'
-      path: '/reference/standards'
-      fullPath: '/reference/standards'
-      preLoaderRoute: typeof ReferenceStandardsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/reference/patterns': {
-      id: '/reference/patterns'
-      path: '/reference/patterns'
-      fullPath: '/reference/patterns'
-      preLoaderRoute: typeof ReferencePatternsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/reference/config': {
-      id: '/reference/config'
-      path: '/reference/config'
-      fullPath: '/reference/config'
-      preLoaderRoute: typeof ReferenceConfigRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/reference/api': {
-      id: '/reference/api'
-      path: '/reference/api'
-      fullPath: '/reference/api'
-      preLoaderRoute: typeof ReferenceApiRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/reference/adr': {
-      id: '/reference/adr'
-      path: '/reference/adr'
-      fullPath: '/reference/adr'
-      preLoaderRoute: typeof ReferenceAdrRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/posts/$postId': {
-      id: '/posts/$postId'
-      path: '/$postId'
-      fullPath: '/posts/$postId'
-      preLoaderRoute: typeof PostsPostIdRouteImport
-      parentRoute: typeof PostsRoute
-    }
-    '/learn/testing': {
-      id: '/learn/testing'
-      path: '/learn/testing'
-      fullPath: '/learn/testing'
-      preLoaderRoute: typeof LearnTestingRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/learn/rest-api': {
-      id: '/learn/rest-api'
-      path: '/learn/rest-api'
-      fullPath: '/learn/rest-api'
-      preLoaderRoute: typeof LearnRestApiRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/learn/frontend': {
-      id: '/learn/frontend'
-      path: '/learn/frontend'
-      fullPath: '/learn/frontend'
-      preLoaderRoute: typeof LearnFrontendRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/learn/database': {
-      id: '/learn/database'
-      path: '/learn/database'
-      fullPath: '/learn/database'
-      preLoaderRoute: typeof LearnDatabaseRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/learn/caching': {
-      id: '/learn/caching'
-      path: '/learn/caching'
-      fullPath: '/learn/caching'
-      preLoaderRoute: typeof LearnCachingRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/learn/authentication': {
-      id: '/learn/authentication'
-      path: '/learn/authentication'
-      fullPath: '/learn/authentication'
-      preLoaderRoute: typeof LearnAuthenticationRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/learn/architecture': {
-      id: '/learn/architecture'
-      path: '/learn/architecture'
-      fullPath: '/learn/architecture'
-      preLoaderRoute: typeof LearnArchitectureRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/guides/troubleshooting': {
-      id: '/guides/troubleshooting'
-      path: '/guides/troubleshooting'
-      fullPath: '/guides/troubleshooting'
-      preLoaderRoute: typeof GuidesTroubleshootingRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/guides/testing': {
-      id: '/guides/testing'
-      path: '/guides/testing'
-      fullPath: '/guides/testing'
-      preLoaderRoute: typeof GuidesTestingRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/guides/migrations': {
-      id: '/guides/migrations'
-      path: '/guides/migrations'
-      fullPath: '/guides/migrations'
-      preLoaderRoute: typeof GuidesMigrationsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/guides/git-workflow': {
-      id: '/guides/git-workflow'
-      path: '/guides/git-workflow'
-      fullPath: '/guides/git-workflow'
-      preLoaderRoute: typeof GuidesGitWorkflowRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/guides/deployment': {
-      id: '/guides/deployment'
-      path: '/guides/deployment'
-      fullPath: '/guides/deployment'
-      preLoaderRoute: typeof GuidesDeploymentRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/guides/customization': {
-      id: '/guides/customization'
-      path: '/guides/customization'
-      fullPath: '/guides/customization'
-      preLoaderRoute: typeof GuidesCustomizationRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/guides/add-entity': {
-      id: '/guides/add-entity'
-      path: '/guides/add-entity'
-      fullPath: '/guides/add-entity'
-      preLoaderRoute: typeof GuidesAddEntityRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/guides/add-endpoint': {
-      id: '/guides/add-endpoint'
-      path: '/guides/add-endpoint'
-      fullPath: '/guides/add-endpoint'
-      preLoaderRoute: typeof GuidesAddEndpointRouteImport
-      parentRoute: typeof rootRouteImport
+    '/docs/handbook': {
+      id: '/docs/handbook'
+      path: '/handbook'
+      fullPath: '/docs/handbook'
+      preLoaderRoute: typeof DocsHandbookRouteImport
+      parentRoute: typeof DocsRoute
     }
     '/auth/login': {
       id: '/auth/login'
@@ -921,14 +572,196 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: ''
       preLoaderRoute: typeof PathlessLayoutNestedLayoutRouteImport
-      parentRoute: typeof PathlessLayoutRoute
-    }
-    '/posts_/$postId/deep': {
-      id: '/posts_/$postId/deep'
-      path: '/posts/$postId/deep'
-      fullPath: '/posts/$postId/deep'
-      preLoaderRoute: typeof PostsPostIdDeepRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/docs/tools/': {
+      id: '/docs/tools/'
+      path: '/tools'
+      fullPath: '/docs/tools'
+      preLoaderRoute: typeof DocsToolsIndexRouteImport
+      parentRoute: typeof DocsRoute
+    }
+    '/docs/reference/': {
+      id: '/docs/reference/'
+      path: '/reference'
+      fullPath: '/docs/reference'
+      preLoaderRoute: typeof DocsReferenceIndexRouteImport
+      parentRoute: typeof DocsRoute
+    }
+    '/docs/learn/': {
+      id: '/docs/learn/'
+      path: '/learn'
+      fullPath: '/docs/learn'
+      preLoaderRoute: typeof DocsLearnIndexRouteImport
+      parentRoute: typeof DocsRoute
+    }
+    '/docs/guides/': {
+      id: '/docs/guides/'
+      path: '/guides'
+      fullPath: '/docs/guides'
+      preLoaderRoute: typeof DocsGuidesIndexRouteImport
+      parentRoute: typeof DocsRoute
+    }
+    '/docs/tools/scaffolding': {
+      id: '/docs/tools/scaffolding'
+      path: '/tools/scaffolding'
+      fullPath: '/docs/tools/scaffolding'
+      preLoaderRoute: typeof DocsToolsScaffoldingRouteImport
+      parentRoute: typeof DocsRoute
+    }
+    '/docs/tools/monitoring': {
+      id: '/docs/tools/monitoring'
+      path: '/tools/monitoring'
+      fullPath: '/docs/tools/monitoring'
+      preLoaderRoute: typeof DocsToolsMonitoringRouteImport
+      parentRoute: typeof DocsRoute
+    }
+    '/docs/tools/api-playground': {
+      id: '/docs/tools/api-playground'
+      path: '/tools/api-playground'
+      fullPath: '/docs/tools/api-playground'
+      preLoaderRoute: typeof DocsToolsApiPlaygroundRouteImport
+      parentRoute: typeof DocsRoute
+    }
+    '/docs/reference/standards': {
+      id: '/docs/reference/standards'
+      path: '/reference/standards'
+      fullPath: '/docs/reference/standards'
+      preLoaderRoute: typeof DocsReferenceStandardsRouteImport
+      parentRoute: typeof DocsRoute
+    }
+    '/docs/reference/patterns': {
+      id: '/docs/reference/patterns'
+      path: '/reference/patterns'
+      fullPath: '/docs/reference/patterns'
+      preLoaderRoute: typeof DocsReferencePatternsRouteImport
+      parentRoute: typeof DocsRoute
+    }
+    '/docs/reference/config': {
+      id: '/docs/reference/config'
+      path: '/reference/config'
+      fullPath: '/docs/reference/config'
+      preLoaderRoute: typeof DocsReferenceConfigRouteImport
+      parentRoute: typeof DocsRoute
+    }
+    '/docs/reference/api': {
+      id: '/docs/reference/api'
+      path: '/reference/api'
+      fullPath: '/docs/reference/api'
+      preLoaderRoute: typeof DocsReferenceApiRouteImport
+      parentRoute: typeof DocsRoute
+    }
+    '/docs/reference/adr': {
+      id: '/docs/reference/adr'
+      path: '/reference/adr'
+      fullPath: '/docs/reference/adr'
+      preLoaderRoute: typeof DocsReferenceAdrRouteImport
+      parentRoute: typeof DocsRoute
+    }
+    '/docs/learn/testing': {
+      id: '/docs/learn/testing'
+      path: '/learn/testing'
+      fullPath: '/docs/learn/testing'
+      preLoaderRoute: typeof DocsLearnTestingRouteImport
+      parentRoute: typeof DocsRoute
+    }
+    '/docs/learn/rest-api': {
+      id: '/docs/learn/rest-api'
+      path: '/learn/rest-api'
+      fullPath: '/docs/learn/rest-api'
+      preLoaderRoute: typeof DocsLearnRestApiRouteImport
+      parentRoute: typeof DocsRoute
+    }
+    '/docs/learn/frontend': {
+      id: '/docs/learn/frontend'
+      path: '/learn/frontend'
+      fullPath: '/docs/learn/frontend'
+      preLoaderRoute: typeof DocsLearnFrontendRouteImport
+      parentRoute: typeof DocsRoute
+    }
+    '/docs/learn/database': {
+      id: '/docs/learn/database'
+      path: '/learn/database'
+      fullPath: '/docs/learn/database'
+      preLoaderRoute: typeof DocsLearnDatabaseRouteImport
+      parentRoute: typeof DocsRoute
+    }
+    '/docs/learn/caching': {
+      id: '/docs/learn/caching'
+      path: '/learn/caching'
+      fullPath: '/docs/learn/caching'
+      preLoaderRoute: typeof DocsLearnCachingRouteImport
+      parentRoute: typeof DocsRoute
+    }
+    '/docs/learn/authentication': {
+      id: '/docs/learn/authentication'
+      path: '/learn/authentication'
+      fullPath: '/docs/learn/authentication'
+      preLoaderRoute: typeof DocsLearnAuthenticationRouteImport
+      parentRoute: typeof DocsRoute
+    }
+    '/docs/learn/architecture': {
+      id: '/docs/learn/architecture'
+      path: '/learn/architecture'
+      fullPath: '/docs/learn/architecture'
+      preLoaderRoute: typeof DocsLearnArchitectureRouteImport
+      parentRoute: typeof DocsRoute
+    }
+    '/docs/guides/troubleshooting': {
+      id: '/docs/guides/troubleshooting'
+      path: '/guides/troubleshooting'
+      fullPath: '/docs/guides/troubleshooting'
+      preLoaderRoute: typeof DocsGuidesTroubleshootingRouteImport
+      parentRoute: typeof DocsRoute
+    }
+    '/docs/guides/testing': {
+      id: '/docs/guides/testing'
+      path: '/guides/testing'
+      fullPath: '/docs/guides/testing'
+      preLoaderRoute: typeof DocsGuidesTestingRouteImport
+      parentRoute: typeof DocsRoute
+    }
+    '/docs/guides/migrations': {
+      id: '/docs/guides/migrations'
+      path: '/guides/migrations'
+      fullPath: '/docs/guides/migrations'
+      preLoaderRoute: typeof DocsGuidesMigrationsRouteImport
+      parentRoute: typeof DocsRoute
+    }
+    '/docs/guides/git-workflow': {
+      id: '/docs/guides/git-workflow'
+      path: '/guides/git-workflow'
+      fullPath: '/docs/guides/git-workflow'
+      preLoaderRoute: typeof DocsGuidesGitWorkflowRouteImport
+      parentRoute: typeof DocsRoute
+    }
+    '/docs/guides/deployment': {
+      id: '/docs/guides/deployment'
+      path: '/guides/deployment'
+      fullPath: '/docs/guides/deployment'
+      preLoaderRoute: typeof DocsGuidesDeploymentRouteImport
+      parentRoute: typeof DocsRoute
+    }
+    '/docs/guides/customization': {
+      id: '/docs/guides/customization'
+      path: '/guides/customization'
+      fullPath: '/docs/guides/customization'
+      preLoaderRoute: typeof DocsGuidesCustomizationRouteImport
+      parentRoute: typeof DocsRoute
+    }
+    '/docs/guides/add-entity': {
+      id: '/docs/guides/add-entity'
+      path: '/guides/add-entity'
+      fullPath: '/docs/guides/add-entity'
+      preLoaderRoute: typeof DocsGuidesAddEntityRouteImport
+      parentRoute: typeof DocsRoute
+    }
+    '/docs/guides/add-endpoint': {
+      id: '/docs/guides/add-endpoint'
+      path: '/guides/add-endpoint'
+      fullPath: '/docs/guides/add-endpoint'
+      preLoaderRoute: typeof DocsGuidesAddEndpointRouteImport
+      parentRoute: typeof DocsRoute
     }
     '/_pathlessLayout/_nested-layout/route-b': {
       id: '/_pathlessLayout/_nested-layout/route-b'
@@ -948,13 +781,6 @@ declare module '@tanstack/react-router' {
 }
 declare module '@tanstack/react-start/server' {
   interface ServerFileRoutesByPath {
-    '/customScript.js': {
-      id: '/customScript.js'
-      path: '/customScript.js'
-      fullPath: '/customScript.js'
-      preLoaderRoute: typeof CustomScriptDotjsServerRouteImport
-      parentRoute: typeof rootServerRouteImport
-    }
     '/api/users': {
       id: '/api/users'
       path: '/api/users'
@@ -971,6 +797,74 @@ declare module '@tanstack/react-start/server' {
     }
   }
 }
+
+interface DocsRouteChildren {
+  DocsHandbookRoute: typeof DocsHandbookRoute
+  DocsWelcomeRoute: typeof DocsWelcomeRoute
+  DocsIndexRoute: typeof DocsIndexRoute
+  DocsGuidesAddEndpointRoute: typeof DocsGuidesAddEndpointRoute
+  DocsGuidesAddEntityRoute: typeof DocsGuidesAddEntityRoute
+  DocsGuidesCustomizationRoute: typeof DocsGuidesCustomizationRoute
+  DocsGuidesDeploymentRoute: typeof DocsGuidesDeploymentRoute
+  DocsGuidesGitWorkflowRoute: typeof DocsGuidesGitWorkflowRoute
+  DocsGuidesMigrationsRoute: typeof DocsGuidesMigrationsRoute
+  DocsGuidesTestingRoute: typeof DocsGuidesTestingRoute
+  DocsGuidesTroubleshootingRoute: typeof DocsGuidesTroubleshootingRoute
+  DocsLearnArchitectureRoute: typeof DocsLearnArchitectureRoute
+  DocsLearnAuthenticationRoute: typeof DocsLearnAuthenticationRoute
+  DocsLearnCachingRoute: typeof DocsLearnCachingRoute
+  DocsLearnDatabaseRoute: typeof DocsLearnDatabaseRoute
+  DocsLearnFrontendRoute: typeof DocsLearnFrontendRoute
+  DocsLearnRestApiRoute: typeof DocsLearnRestApiRoute
+  DocsLearnTestingRoute: typeof DocsLearnTestingRoute
+  DocsReferenceAdrRoute: typeof DocsReferenceAdrRoute
+  DocsReferenceApiRoute: typeof DocsReferenceApiRoute
+  DocsReferenceConfigRoute: typeof DocsReferenceConfigRoute
+  DocsReferencePatternsRoute: typeof DocsReferencePatternsRoute
+  DocsReferenceStandardsRoute: typeof DocsReferenceStandardsRoute
+  DocsToolsApiPlaygroundRoute: typeof DocsToolsApiPlaygroundRoute
+  DocsToolsMonitoringRoute: typeof DocsToolsMonitoringRoute
+  DocsToolsScaffoldingRoute: typeof DocsToolsScaffoldingRoute
+  DocsGuidesIndexRoute: typeof DocsGuidesIndexRoute
+  DocsLearnIndexRoute: typeof DocsLearnIndexRoute
+  DocsReferenceIndexRoute: typeof DocsReferenceIndexRoute
+  DocsToolsIndexRoute: typeof DocsToolsIndexRoute
+}
+
+const DocsRouteChildren: DocsRouteChildren = {
+  DocsHandbookRoute: DocsHandbookRoute,
+  DocsWelcomeRoute: DocsWelcomeRoute,
+  DocsIndexRoute: DocsIndexRoute,
+  DocsGuidesAddEndpointRoute: DocsGuidesAddEndpointRoute,
+  DocsGuidesAddEntityRoute: DocsGuidesAddEntityRoute,
+  DocsGuidesCustomizationRoute: DocsGuidesCustomizationRoute,
+  DocsGuidesDeploymentRoute: DocsGuidesDeploymentRoute,
+  DocsGuidesGitWorkflowRoute: DocsGuidesGitWorkflowRoute,
+  DocsGuidesMigrationsRoute: DocsGuidesMigrationsRoute,
+  DocsGuidesTestingRoute: DocsGuidesTestingRoute,
+  DocsGuidesTroubleshootingRoute: DocsGuidesTroubleshootingRoute,
+  DocsLearnArchitectureRoute: DocsLearnArchitectureRoute,
+  DocsLearnAuthenticationRoute: DocsLearnAuthenticationRoute,
+  DocsLearnCachingRoute: DocsLearnCachingRoute,
+  DocsLearnDatabaseRoute: DocsLearnDatabaseRoute,
+  DocsLearnFrontendRoute: DocsLearnFrontendRoute,
+  DocsLearnRestApiRoute: DocsLearnRestApiRoute,
+  DocsLearnTestingRoute: DocsLearnTestingRoute,
+  DocsReferenceAdrRoute: DocsReferenceAdrRoute,
+  DocsReferenceApiRoute: DocsReferenceApiRoute,
+  DocsReferenceConfigRoute: DocsReferenceConfigRoute,
+  DocsReferencePatternsRoute: DocsReferencePatternsRoute,
+  DocsReferenceStandardsRoute: DocsReferenceStandardsRoute,
+  DocsToolsApiPlaygroundRoute: DocsToolsApiPlaygroundRoute,
+  DocsToolsMonitoringRoute: DocsToolsMonitoringRoute,
+  DocsToolsScaffoldingRoute: DocsToolsScaffoldingRoute,
+  DocsGuidesIndexRoute: DocsGuidesIndexRoute,
+  DocsLearnIndexRoute: DocsLearnIndexRoute,
+  DocsReferenceIndexRoute: DocsReferenceIndexRoute,
+  DocsToolsIndexRoute: DocsToolsIndexRoute,
+}
+
+const DocsRouteWithChildren = DocsRoute._addFileChildren(DocsRouteChildren)
 
 interface PathlessLayoutNestedLayoutRouteChildren {
   PathlessLayoutNestedLayoutRouteARoute: typeof PathlessLayoutNestedLayoutRouteARoute
@@ -990,42 +884,6 @@ const PathlessLayoutNestedLayoutRouteWithChildren =
     PathlessLayoutNestedLayoutRouteChildren,
   )
 
-interface PathlessLayoutRouteChildren {
-  PathlessLayoutNestedLayoutRoute: typeof PathlessLayoutNestedLayoutRouteWithChildren
-}
-
-const PathlessLayoutRouteChildren: PathlessLayoutRouteChildren = {
-  PathlessLayoutNestedLayoutRoute: PathlessLayoutNestedLayoutRouteWithChildren,
-}
-
-const PathlessLayoutRouteWithChildren = PathlessLayoutRoute._addFileChildren(
-  PathlessLayoutRouteChildren,
-)
-
-interface PostsRouteChildren {
-  PostsPostIdRoute: typeof PostsPostIdRoute
-  PostsIndexRoute: typeof PostsIndexRoute
-}
-
-const PostsRouteChildren: PostsRouteChildren = {
-  PostsPostIdRoute: PostsPostIdRoute,
-  PostsIndexRoute: PostsIndexRoute,
-}
-
-const PostsRouteWithChildren = PostsRoute._addFileChildren(PostsRouteChildren)
-
-interface UsersRouteChildren {
-  UsersUserIdRoute: typeof UsersUserIdRoute
-  UsersIndexRoute: typeof UsersIndexRoute
-}
-
-const UsersRouteChildren: UsersRouteChildren = {
-  UsersUserIdRoute: UsersUserIdRoute,
-  UsersIndexRoute: UsersIndexRoute,
-}
-
-const UsersRouteWithChildren = UsersRoute._addFileChildren(UsersRouteChildren)
-
 interface ApiUsersServerRouteChildren {
   ApiUsersUserIdServerRoute: typeof ApiUsersUserIdServerRoute
 }
@@ -1040,48 +898,15 @@ const ApiUsersServerRouteWithChildren = ApiUsersServerRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  PathlessLayoutRoute: PathlessLayoutRouteWithChildren,
-  DeferredRoute: DeferredRoute,
-  HandbookRoute: HandbookRoute,
-  PostsRoute: PostsRouteWithChildren,
-  RedirectRoute: RedirectRoute,
-  UsersRoute: UsersRouteWithChildren,
-  WelcomeRoute: WelcomeRoute,
+  DashboardRoute: DashboardRoute,
+  DocsRoute: DocsRouteWithChildren,
+  PathlessLayoutNestedLayoutRoute: PathlessLayoutNestedLayoutRouteWithChildren,
   AuthLoginRoute: AuthLoginRoute,
-  GuidesAddEndpointRoute: GuidesAddEndpointRoute,
-  GuidesAddEntityRoute: GuidesAddEntityRoute,
-  GuidesCustomizationRoute: GuidesCustomizationRoute,
-  GuidesDeploymentRoute: GuidesDeploymentRoute,
-  GuidesGitWorkflowRoute: GuidesGitWorkflowRoute,
-  GuidesMigrationsRoute: GuidesMigrationsRoute,
-  GuidesTestingRoute: GuidesTestingRoute,
-  GuidesTroubleshootingRoute: GuidesTroubleshootingRoute,
-  LearnArchitectureRoute: LearnArchitectureRoute,
-  LearnAuthenticationRoute: LearnAuthenticationRoute,
-  LearnCachingRoute: LearnCachingRoute,
-  LearnDatabaseRoute: LearnDatabaseRoute,
-  LearnFrontendRoute: LearnFrontendRoute,
-  LearnRestApiRoute: LearnRestApiRoute,
-  LearnTestingRoute: LearnTestingRoute,
-  ReferenceAdrRoute: ReferenceAdrRoute,
-  ReferenceApiRoute: ReferenceApiRoute,
-  ReferenceConfigRoute: ReferenceConfigRoute,
-  ReferencePatternsRoute: ReferencePatternsRoute,
-  ReferenceStandardsRoute: ReferenceStandardsRoute,
-  ToolsApiPlaygroundRoute: ToolsApiPlaygroundRoute,
-  ToolsMonitoringRoute: ToolsMonitoringRoute,
-  ToolsScaffoldingRoute: ToolsScaffoldingRoute,
-  GuidesIndexRoute: GuidesIndexRoute,
-  LearnIndexRoute: LearnIndexRoute,
-  ReferenceIndexRoute: ReferenceIndexRoute,
-  ToolsIndexRoute: ToolsIndexRoute,
-  PostsPostIdDeepRoute: PostsPostIdDeepRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
 const rootServerRouteChildren: RootServerRouteChildren = {
-  CustomScriptDotjsServerRoute: CustomScriptDotjsServerRoute,
   ApiUsersServerRoute: ApiUsersServerRouteWithChildren,
 }
 export const serverRouteTree = rootServerRouteImport

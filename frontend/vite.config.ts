@@ -7,7 +7,7 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   server: {
-    port: 3000,
+    port: 5173,
     host: '0.0.0.0', // Allow external connections (Docker)
     proxy: {
       // Proxy API calls to backend during development
