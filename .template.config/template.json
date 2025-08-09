@@ -1,0 +1,230 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "ModernAPI Contributors",
+  "classifications": ["Web", "API", "Clean Architecture", "Enterprise", "Full-Stack"],
+  "identity": "ModernAPI.FullStack",
+  "name": "Modern Full-Stack Application",
+  "shortName": "modernapi",
+  "tags": {
+    "language": "C#",
+    "type": "solution"
+  },
+  "description": "A production-ready full-stack template with .NET Clean Architecture API + React TanStack frontend, JWT authentication, PostgreSQL, Redis, and comprehensive monitoring",
+  "preferNameDirectory": true,
+  "sourceName": "ModernAPI",
+  "symbols": {
+    "ProjectName": {
+      "type": "parameter",
+      "displayName": "Project Name",
+      "description": "The name of your API project (e.g., PersonalOS, TaskManager, BlogAPI)",
+      "datatype": "string",
+      "defaultValue": "ModernAPI",
+      "replaces": "ModernAPI",
+      "fileRename": "ModernAPI"
+    },
+    "AuthorName": {
+      "type": "parameter",
+      "displayName": "Author Name", 
+      "description": "The author name for the project",
+      "datatype": "string",
+      "defaultValue": "API Developer",
+      "replaces": "ModernAPI Template"
+    },
+    "CompanyName": {
+      "type": "parameter",
+      "displayName": "Company/Namespace",
+      "description": "Company or organization namespace",
+      "datatype": "string", 
+      "defaultValue": "Company",
+      "replaces": "ModernAPI"
+    },
+    "DatabaseName": {
+      "type": "parameter",
+      "displayName": "Database Name",
+      "description": "PostgreSQL database name",
+      "datatype": "string",
+      "defaultValue": "modernapi",
+      "replaces": "modernapi"
+    },
+    "JwtIssuer": {
+      "type": "parameter",
+      "displayName": "JWT Issuer",
+      "description": "JWT token issuer name",
+      "datatype": "string",
+      "defaultValue": "ModernAPI",
+      "replaces": "ModernAPI"
+    },
+    "JwtAudience": {
+      "type": "parameter", 
+      "displayName": "JWT Audience",
+      "description": "JWT token audience",
+      "datatype": "string",
+      "defaultValue": "ModernAPI.Users",
+      "replaces": "ModernAPI.Users"
+    },
+    "IncludeAuth": {
+      "type": "parameter",
+      "displayName": "Include Authentication",
+      "description": "Include JWT authentication and user management",
+      "datatype": "bool",
+      "defaultValue": "true"
+    },
+    "IncludeRedis": {
+      "type": "parameter",
+      "displayName": "Include Redis Caching",
+      "description": "Include Redis distributed caching setup",
+      "datatype": "bool", 
+      "defaultValue": "true"
+    },
+    "IncludeMonitoring": {
+      "type": "parameter",
+      "displayName": "Include Monitoring",
+      "description": "Include OpenTelemetry, Prometheus, and Grafana monitoring",
+      "datatype": "bool",
+      "defaultValue": "true"
+    },
+    "IncludeDocker": {
+      "type": "parameter",
+      "displayName": "Include Docker",
+      "description": "Include Docker containerization and docker-compose",
+      "datatype": "bool",
+      "defaultValue": "true"
+    },
+    "IncludeScaffolding": {
+      "type": "parameter",
+      "displayName": "Include Scaffolding Tool",
+      "description": "Include the code scaffolding CLI tool",
+      "datatype": "bool",
+      "defaultValue": "true"
+    },
+    "IncludeCICD": {
+      "type": "parameter",
+      "displayName": "Include CI/CD",
+      "description": "Include GitHub Actions CI/CD workflows",
+      "datatype": "bool",
+      "defaultValue": "true"
+    },
+    "IncludeFrontend": {
+      "type": "parameter",
+      "displayName": "Include Frontend",
+      "description": "Include React + TanStack Router frontend application",
+      "datatype": "bool",
+      "defaultValue": "true"
+    },
+    "FrontendPort": {
+      "type": "parameter",
+      "displayName": "Frontend Port",
+      "description": "Port for the frontend development server",
+      "datatype": "string",
+      "defaultValue": "5173",
+      "replaces": "5173"
+    },
+    "ApiUrl": {
+      "type": "parameter", 
+      "displayName": "API Base URL",
+      "description": "Base URL for API calls from frontend",
+      "datatype": "string",
+      "defaultValue": "http://localhost:5000",
+      "replaces": "http://localhost:5000"
+    }
+  },
+  "sources": [
+    {
+      "modifiers": [
+        {
+          "condition": "(!IncludeAuth)",
+          "exclude": [
+            "backend/ModernAPI.Application/Services/AuthService.cs",
+            "backend/ModernAPI.Application/DTOs/AuthDtos.cs", 
+            "backend/ModernAPI.Application/Interfaces/IAuthService.cs",
+            "backend/ModernAPI.Application/Interfaces/IJwtTokenService.cs",
+            "backend/ModernAPI.Application/Services/JwtTokenService.cs",
+            "backend/ModernAPI.API/Controllers/AuthController.cs",
+            "backend/ModernAPI.Domain/Entities/RefreshToken.cs",
+            "backend/ModernAPI.Infrastructure/Repositories/RefreshTokenRepository.cs"
+          ]
+        },
+        {
+          "condition": "(!IncludeRedis)",
+          "exclude": [
+            "backend/ModernAPI.Infrastructure/Services/RedisDistributedCacheService.cs",
+            "backend/docker-compose.yml"
+          ]
+        },
+        {
+          "condition": "(!IncludeMonitoring)",
+          "exclude": [
+            "backend/ModernAPI.API/Monitoring/**",
+            "backend/monitoring/**",
+            "backend/k8s/monitoring.yml"
+          ]
+        },
+        {
+          "condition": "(!IncludeDocker)",
+          "exclude": [
+            "backend/Dockerfile",
+            "backend/docker-compose*.yml",
+            "backend/.dockerignore"
+          ]
+        },
+        {
+          "condition": "(!IncludeScaffolding)",
+          "exclude": [
+            "backend/tools/**"
+          ]
+        },
+        {
+          "condition": "(!IncludeCICD)",
+          "exclude": [
+            "backend/.github/**"
+          ]
+        },
+        {
+          "condition": "(!IncludeFrontend)",
+          "exclude": [
+            "frontend/**"
+          ]
+        }
+      ]
+    }
+  ],
+  "postActions": [
+    {
+      "condition": "(OS != \"Windows_NT\")",
+      "description": "Make scripts executable",
+      "manualInstructions": [
+        {
+          "text": "Run 'chmod +x backend/scripts/*.sh'"
+        }
+      ],
+      "actionId": "cb9a6cf3-4f5c-4860-b9d2-03a574959774",
+      "args": {
+        "+x": "backend/scripts/*.sh"
+      }
+    },
+    {
+      "description": "Restore NuGet packages",
+      "manualInstructions": [
+        {
+          "text": "Run 'cd backend && dotnet restore'"
+        }
+      ],
+      "actionId": "210D431B-A78B-4D2F-B762-4ED3E3EA9025"
+    },
+    {
+      "condition": "(IncludeFrontend)",
+      "description": "Install frontend dependencies",
+      "manualInstructions": [
+        {
+          "text": "Run 'cd frontend && npm install' or 'cd frontend && bun install'"
+        }
+      ],
+      "actionId": "3A7C4B45-1F5A-4AE2-AA00-E49A14F7C5BF",
+      "args": {
+        "executable": "npm",
+        "args": "install"
+      },
+      "continueOnError": true
+    }
+  ]
+}
