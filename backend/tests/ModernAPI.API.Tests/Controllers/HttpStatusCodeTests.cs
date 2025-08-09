@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using ModernAPI.API.Controllers;
 using ModernAPI.API.Middleware;
+using ModernAPI.API.Monitoring;
 using ModernAPI.API.Services;
 using ModernAPI.API.Tests.Common;
 using ModernAPI.Application.Common.Exceptions;
@@ -68,7 +69,7 @@ public class HttpStatusCodeTests : ApiTestBase
         // Arrange
         var userId = Guid.NewGuid();
         var userDto = CreateValidUserDto(userId);
-        MockUserService.Setup(x => x.GetUserByIdAsync(userId))
+        MockUserService.Setup(x => x.GetUserByIdAsync(userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(userDto);
 
         // Act
@@ -87,7 +88,7 @@ public class HttpStatusCodeTests : ApiTestBase
         // Arrange
         var request = CreateValidCreateUserRequest();
         var response = CreateValidUserResponse();
-        MockUserService.Setup(x => x.CreateUserAsync(request))
+        MockUserService.Setup(x => x.CreateUserAsync(request, It.IsAny<CancellationToken>()))
             .ReturnsAsync(response);
 
         // Act
@@ -102,7 +103,7 @@ public class HttpStatusCodeTests : ApiTestBase
         
         // Verify Location header is set
         createdResult.RouteValues.Should().ContainKey("id");
-        createdResult.RouteValues["id"].Should().Be(response.User.Id);
+        createdResult.RouteValues!["id"].Should().Be(response.User.Id);
     }
 
     [Fact]
@@ -110,7 +111,7 @@ public class HttpStatusCodeTests : ApiTestBase
     {
         // Arrange
         var userId = Guid.NewGuid();
-        MockUserService.Setup(x => x.DeactivateUserAsync(userId))
+        MockUserService.Setup(x => x.DeactivateUserAsync(userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateValidOperationResult());
 
         // Act
@@ -126,7 +127,7 @@ public class HttpStatusCodeTests : ApiTestBase
     public async Task Login_WithValidCredentials_ShouldReturn200OK()
     {
         // Arrange
-        var request = new LoginRequest { Email = "test@example.com", Password = "password123" };
+        var request = new LoginRequest("test@example.com", "password123");
         var response = CreateValidAuthResponse();
         _mockAuthService.Setup(x => x.LoginAsync(request, It.IsAny<CancellationToken>()))
             .ReturnsAsync(response);
@@ -145,12 +146,7 @@ public class HttpStatusCodeTests : ApiTestBase
     public async Task Register_WithValidRequest_ShouldReturn201Created()
     {
         // Arrange
-        var request = new RegisterRequest 
-        { 
-            Email = "newuser@example.com", 
-            Password = "Password123!",
-            DisplayName = "New User"
-        };
+        var request = new RegisterRequest("newuser@example.com", "Password123!", "Password123!", "New User", null, null);
         var response = CreateValidAuthResponse();
         _mockAuthService.Setup(x => x.RegisterAsync(request, It.IsAny<CancellationToken>()))
             .ReturnsAsync(response);
@@ -175,7 +171,7 @@ public class HttpStatusCodeTests : ApiTestBase
     {
         // Arrange
         var userId = Guid.NewGuid();
-        MockUserService.Setup(x => x.GetUserByIdAsync(userId))
+        MockUserService.Setup(x => x.GetUserByIdAsync(userId, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new NotFoundException("User", userId.ToString()));
 
         // Act & Assert
@@ -191,7 +187,7 @@ public class HttpStatusCodeTests : ApiTestBase
     {
         // Arrange
         var request = CreateValidCreateUserRequest();
-        MockUserService.Setup(x => x.CreateUserAsync(request))
+        MockUserService.Setup(x => x.CreateUserAsync(request, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new ConflictException("User", request.Email, "A user with this email already exists"));
 
         // Act & Assert
@@ -213,7 +209,7 @@ public class HttpStatusCodeTests : ApiTestBase
             ["DisplayName"] = ["Display name must be between 2 and 50 characters"]
         };
         
-        MockUserService.Setup(x => x.CreateUserAsync(request))
+        MockUserService.Setup(x => x.CreateUserAsync(request, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new ValidationException(validationErrors));
 
         // Act & Assert
@@ -227,7 +223,7 @@ public class HttpStatusCodeTests : ApiTestBase
     public async Task Login_WithInvalidCredentials_ShouldReturn401Unauthorized()
     {
         // Arrange
-        var request = new LoginRequest { Email = "test@example.com", Password = "wrongpassword" };
+        var request = new LoginRequest("test@example.com", "wrongpassword");
         _mockAuthService.Setup(x => x.LoginAsync(request, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new UnauthorizedAccessException("Invalid credentials"));
 
@@ -243,13 +239,13 @@ public class HttpStatusCodeTests : ApiTestBase
     {
         // Arrange
         var userId = Guid.NewGuid();
-        var request = new UpdateUserProfileRequest { DisplayName = "Updated Name" };
+        var request = new UpdateUserProfileRequest("Updated Name");
         var currentUser = CreateValidUserDto(userId);
         
-        MockUserService.Setup(x => x.GetUserByIdAsync(userId))
+        MockUserService.Setup(x => x.GetUserByIdAsync(userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(currentUser);
         
-        MockUserService.Setup(x => x.UpdateUserProfileAsync(userId, request))
+        MockUserService.Setup(x => x.UpdateUserProfileAsync(userId, request, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new PreconditionFailedException("User", "ETag mismatch - resource has been modified"));
 
         // Setup conditional update validation to return precondition failed
@@ -546,53 +542,42 @@ public class HttpStatusCodeTests : ApiTestBase
 
     private AuthResponse CreateValidAuthResponse()
     {
-        return new AuthResponse
-        {
-            AccessToken = "valid-access-token",
-            RefreshToken = "valid-refresh-token",
-            ExpiresAt = DateTimeOffset.UtcNow.AddHours(1),
-            User = new AuthUserDto
-            {
-                Id = Guid.NewGuid(),
-                Email = "test@example.com",
-                DisplayName = "Test User",
-                IsEmailVerified = true
-            }
-        };
+        var user = new UserDto(
+            Guid.NewGuid(),
+            "test@example.com",
+            "Test User",
+            "Test",
+            "User",
+            true,
+            true,
+            DateTime.UtcNow.AddDays(-30),
+            DateTime.UtcNow
+        );
+
+        return new AuthResponse(
+            "valid-access-token",
+            "valid-refresh-token",
+            DateTime.UtcNow.AddHours(1),
+            DateTime.UtcNow.AddDays(7),
+            user
+        );
     }
 
     private UserDto CreateValidUserDto(Guid? id = null)
     {
-        return new UserDto
-        {
-            Id = id ?? Guid.NewGuid(),
-            Email = "test@example.com",
-            DisplayName = "Test User",
-            IsActive = true,
-            IsEmailVerified = true,
-            CreatedAt = DateTime.UtcNow.AddDays(-30),
-            UpdatedAt = DateTime.UtcNow
-        };
+        return new UserDto(
+            id ?? Guid.NewGuid(),
+            "test@example.com",
+            "Test User",
+            "Test",
+            "User",
+            true,
+            true,
+            DateTime.UtcNow.AddDays(-30),
+            DateTime.UtcNow
+        );
     }
 
-    private CreateUserRequest CreateValidCreateUserRequest()
-    {
-        return new CreateUserRequest
-        {
-            Email = "newuser@example.com",
-            DisplayName = "New User",
-            Password = "SecurePassword123!"
-        };
-    }
-
-    private UserResponse CreateValidUserResponse()
-    {
-        return new UserResponse
-        {
-            User = CreateValidUserDto(),
-            Message = "User created successfully"
-        };
-    }
 
     private OperationResult CreateValidOperationResult()
     {

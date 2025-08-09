@@ -4,10 +4,11 @@ using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using ModernAPI.API.Controllers;
+using ModernAPI.API.Services;
 using ModernAPI.API.Tests.Common;
 using ModernAPI.Application.Common.Exceptions;
 using ModernAPI.Application.DTOs;
-using ModernAPI.API.Services;
+using ModernAPI.Application.Services;
 using Moq;
 
 namespace ModernAPI.API.Tests.Controllers;
@@ -25,7 +26,9 @@ public class UsersControllerTests : ApiTestBase
     {
         _mockLogger = CreateMockLogger<UsersController>();
         _mockLinkGenerator = new Mock<ILinkGenerator>();
-        _controller = new UsersController(MockUserService.Object, _mockLogger.Object, _mockLinkGenerator.Object);
+        var mockCachingService = new Mock<IHttpCachingService>();
+        var mockETagService = new Mock<IETagService>();
+        _controller = new UsersController(MockUserService.Object, _mockLogger.Object, _mockLinkGenerator.Object, mockCachingService.Object, mockETagService.Object);
     }
 
     [Fact]

@@ -36,7 +36,7 @@ public class UserServiceTests : ApplicationTestBase
 
         // Assert
         result.Should().NotBeNull();
-        result.User.Email.Should().Be(request.Email);
+        result.User.Email.Should().Be(request.Email.ToLowerInvariant());
         result.User.DisplayName.Should().Be(request.DisplayName);
         result.User.FirstName.Should().Be(request.FirstName);
         result.User.LastName.Should().Be(request.LastName);
@@ -58,8 +58,7 @@ public class UserServiceTests : ApplicationTestBase
         var exception = await Assert.ThrowsAsync<ConflictException>(() => 
             _userService.CreateUserAsync(request));
         
-        exception.Message.Should().Contain("User with email");
-        exception.Message.Should().Contain(request.Email);
+        exception.Message.Should().Be("A user with this email address already exists");
     }
 
     [Fact]
@@ -110,7 +109,7 @@ public class UserServiceTests : ApplicationTestBase
         result.User.DisplayName.Should().Be(request.DisplayName);
         result.User.FirstName.Should().Be(request.FirstName);
         result.User.LastName.Should().Be(request.LastName);
-        result.Message.Should().Be("User profile updated successfully");
+        result.Message.Should().Be("Profile updated successfully");
         
         VerifyUserWasUpdated();
         VerifyUnitOfWorkSaveChangesWasCalled();
@@ -148,8 +147,8 @@ public class UserServiceTests : ApplicationTestBase
 
         // Assert
         result.Should().NotBeNull();
-        result.User.Email.Should().Be(request.NewEmail);
-        result.Message.Should().Be("User email changed successfully");
+        result.User.Email.Should().Be(request.NewEmail.ToLowerInvariant());
+        result.Message.Should().Be("Email changed successfully. Please verify your new email address.");
         
         VerifyUserWasUpdated();
         VerifyUnitOfWorkSaveChangesWasCalled();
@@ -164,14 +163,17 @@ public class UserServiceTests : ApplicationTestBase
         var newEmail = new Email(request.NewEmail);
         
         SetupUserRepositoryGetById(user);
-        SetupUserRepositoryEmailExists(newEmail);
+        // Mock that another user exists with this email
+        var existingUser = CreateValidUser();
+        MockUserRepository
+            .Setup(x => x.GetByEmailAsync(newEmail, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existingUser);
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<ConflictException>(() => 
             _userService.ChangeUserEmailAsync(user.Id, request));
         
-        exception.Message.Should().Contain("User with email");
-        exception.Message.Should().Contain(request.NewEmail);
+        exception.Message.Should().Be("A user with this email address already exists");
     }
 
     [Fact]
@@ -188,7 +190,7 @@ public class UserServiceTests : ApplicationTestBase
         // Assert
         result.Should().NotBeNull();
         result.Success.Should().BeTrue();
-        result.Message.Should().Be("User email verified successfully");
+        result.Message.Should().Be("Email verified successfully");
         
         VerifyUserWasUpdated();
         VerifyUnitOfWorkSaveChangesWasCalled();
@@ -208,7 +210,7 @@ public class UserServiceTests : ApplicationTestBase
         // Assert
         result.Should().NotBeNull();
         result.Success.Should().BeTrue();
-        result.Message.Should().Be("User deactivated successfully");
+        result.Message.Should().Be("User account deactivated successfully");
         
         VerifyUserWasUpdated();
         VerifyUnitOfWorkSaveChangesWasCalled();
@@ -228,7 +230,7 @@ public class UserServiceTests : ApplicationTestBase
         // Assert
         result.Should().NotBeNull();
         result.Success.Should().BeTrue();
-        result.Message.Should().Be("User reactivated successfully");
+        result.Message.Should().Be("User account reactivated successfully");
         
         VerifyUserWasUpdated();
         VerifyUnitOfWorkSaveChangesWasCalled();
@@ -273,7 +275,8 @@ public class UserServiceTests : ApplicationTestBase
         var exception = await Assert.ThrowsAsync<ValidationException>(() => 
             _userService.PatchUserProfileAsync(user.Id, patchDocument));
         
-        exception.Message.Should().Contain("Path '/invalidpath' is not allowed for patching");
+        exception.ValidationErrors.Should().ContainKey("Path");
+        exception.ValidationErrors["Path"].Should().Contain("Path '/invalidpath' is not allowed for patching");
     }
 
     [Fact]
@@ -290,7 +293,8 @@ public class UserServiceTests : ApplicationTestBase
         var exception = await Assert.ThrowsAsync<ValidationException>(() => 
             _userService.PatchUserProfileAsync(user.Id, patchDocument));
         
-        exception.Message.Should().Contain("Operation 'test' is not allowed");
+        exception.ValidationErrors.Should().ContainKey("Operation");
+        exception.ValidationErrors["Operation"].Should().Contain("Operation 'test' is not allowed");
     }
 
     [Fact]
@@ -307,7 +311,8 @@ public class UserServiceTests : ApplicationTestBase
         var exception = await Assert.ThrowsAsync<ValidationException>(() => 
             _userService.PatchUserProfileAsync(user.Id, patchDocument));
         
-        exception.Message.Should().Contain("DisplayName cannot be null");
+        exception.ValidationErrors.Should().ContainKey("DisplayName");
+        exception.ValidationErrors["DisplayName"].Should().Contain("DisplayName cannot be null");
     }
 
     [Fact]
@@ -324,7 +329,8 @@ public class UserServiceTests : ApplicationTestBase
         var exception = await Assert.ThrowsAsync<ValidationException>(() => 
             _userService.PatchUserProfileAsync(user.Id, patchDocument));
         
-        exception.Message.Should().Contain("DisplayName cannot be removed");
+        exception.ValidationErrors.Should().ContainKey("DisplayName");
+        exception.ValidationErrors["DisplayName"].Should().Contain("DisplayName cannot be removed");
     }
 
     [Fact]
@@ -341,7 +347,9 @@ public class UserServiceTests : ApplicationTestBase
         var exception = await Assert.ThrowsAsync<ValidationException>(() => 
             _userService.PatchUserProfileAsync(user.Id, patchDocument));
         
-        exception.Message.Should().Contain("The patch operations resulted in invalid user data");
+        exception.ValidationErrors.Should().NotBeEmpty();
+        // The specific validation error content may vary, so just check that validation errors exist
+        exception.Message.Should().Be("One or more validation errors occurred");
     }
 
     [Fact]

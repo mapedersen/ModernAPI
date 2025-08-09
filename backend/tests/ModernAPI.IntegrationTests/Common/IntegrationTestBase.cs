@@ -11,6 +11,7 @@ using ModernAPI.Infrastructure.Data;
 using Newtonsoft.Json;
 using Respawn;
 using Testcontainers.PostgreSql;
+using Npgsql;
 
 namespace ModernAPI.IntegrationTests.Common;
 
@@ -46,11 +47,19 @@ public abstract class IntegrationTestBase : IAsyncDisposable, IDisposable
             {
                 builder.UseEnvironment("Testing");
                 
+                // Set environment variables for tests before services are configured
+                Environment.SetEnvironmentVariable("POSTGRES_CONNECTION_STRING", _postgresContainer.GetConnectionString());
+                Environment.SetEnvironmentVariable("JWT_SECRET", "test-jwt-secret-for-integration-tests-32-chars-minimum");
+                
                 builder.ConfigureAppConfiguration(config =>
                 {
                     config.AddInMemoryCollection(new Dictionary<string, string?>
                     {
                         ["ConnectionStrings:DefaultConnection"] = _postgresContainer.GetConnectionString(),
+                        ["JwtSettings:Secret"] = "test-jwt-secret-for-integration-tests-32-chars-minimum",
+                        ["JwtSettings:Issuer"] = "ModernAPI.Test",
+                        ["JwtSettings:Audience"] = "ModernAPI.Test",
+                        ["JwtSettings:ExpiryInMinutes"] = "60",
                         ["Logging:LogLevel:Default"] = "Warning"
                     });
                 });
@@ -58,10 +67,14 @@ public abstract class IntegrationTestBase : IAsyncDisposable, IDisposable
                 builder.ConfigureServices(services =>
                 {
                     // Remove the existing DbContext registration
-                    var descriptor = services.SingleOrDefault(
-                        d => d.ServiceType == typeof(DbContextOptions<ApplicationDbContext>));
-                    if (descriptor != null)
+                    var descriptors = services.Where(
+                        d => d.ServiceType == typeof(DbContextOptions<ApplicationDbContext>) ||
+                             d.ServiceType == typeof(ApplicationDbContext)).ToList();
+                    
+                    foreach (var descriptor in descriptors)
+                    {
                         services.Remove(descriptor);
+                    }
 
                     // Add new DbContext with test connection string
                     services.AddDbContext<ApplicationDbContext>(options =>
@@ -88,7 +101,9 @@ public abstract class IntegrationTestBase : IAsyncDisposable, IDisposable
     /// </summary>
     private async Task InitializeRespawner()
     {
-        _respawner = await Respawner.CreateAsync(_postgresContainer.GetConnectionString(), new RespawnerOptions
+        using var connection = new NpgsqlConnection(_postgresContainer.GetConnectionString());
+        await connection.OpenAsync();
+        _respawner = await Respawner.CreateAsync(connection, new RespawnerOptions
         {
             DbAdapter = DbAdapter.Postgres,
             SchemasToInclude = ["public"],
@@ -103,7 +118,9 @@ public abstract class IntegrationTestBase : IAsyncDisposable, IDisposable
     {
         if (_respawner != null)
         {
-            await _respawner.ResetAsync(_postgresContainer.GetConnectionString());
+            using var connection = new NpgsqlConnection(_postgresContainer.GetConnectionString());
+            await connection.OpenAsync();
+            await _respawner.ResetAsync(connection);
         }
     }
 
@@ -208,6 +225,11 @@ public abstract class IntegrationTestBase : IAsyncDisposable, IDisposable
         HttpClient.Dispose();
         _factory.Dispose();
         await _postgresContainer.DisposeAsync();
+        
+        // Clean up environment variables
+        Environment.SetEnvironmentVariable("POSTGRES_CONNECTION_STRING", null);
+        Environment.SetEnvironmentVariable("JWT_SECRET", null);
+        
         GC.SuppressFinalize(this);
     }
 
@@ -217,6 +239,11 @@ public abstract class IntegrationTestBase : IAsyncDisposable, IDisposable
         HttpClient.Dispose();
         _factory.Dispose();
         Task.Run(async () => await _postgresContainer.DisposeAsync()).Wait();
+        
+        // Clean up environment variables
+        Environment.SetEnvironmentVariable("POSTGRES_CONNECTION_STRING", null);
+        Environment.SetEnvironmentVariable("JWT_SECRET", null);
+        
         GC.SuppressFinalize(this);
     }
 }

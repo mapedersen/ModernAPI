@@ -1,11 +1,6 @@
 using FluentAssertions;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using ModernAPI.Application.DTOs;
-using ModernAPI.Infrastructure.Data;
+using ModernAPI.IntegrationTests.Common;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
@@ -18,40 +13,9 @@ namespace ModernAPI.IntegrationTests.Caching;
 /// Integration tests to verify that HATEOAS responses include proper HTTP caching headers.
 /// Ensures that hypermedia links are cached appropriately along with the primary resource data.
 /// </summary>
-public class HateoasCachingIntegrationTests : IClassFixture<WebApplicationFactory<Program>>, IDisposable
+public class HateoasCachingIntegrationTests : IntegrationTestBase
 {
-    private readonly WebApplicationFactory<Program> _factory;
-    private readonly HttpClient _client;
-    private readonly string _testDbName;
 
-    public HateoasCachingIntegrationTests(WebApplicationFactory<Program> factory)
-    {
-        _testDbName = $"TestDb_HateoasCaching_{Guid.NewGuid()}";
-
-        _factory = factory.WithWebHostBuilder(builder =>
-        {
-            builder.UseEnvironment("Testing");
-            builder.ConfigureServices(services =>
-            {
-                var descriptor = services.SingleOrDefault(
-                    d => d.ServiceType == typeof(DbContextOptions<ApplicationDbContext>));
-                if (descriptor != null)
-                    services.Remove(descriptor);
-
-                services.AddDbContext<ApplicationDbContext>(options =>
-                {
-                    options.UseInMemoryDatabase(_testDbName);
-                });
-
-                var serviceProvider = services.BuildServiceProvider();
-                using var scope = serviceProvider.CreateScope();
-                var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-                context.Database.EnsureCreated();
-            });
-        });
-
-        _client = _factory.CreateClient();
-    }
 
     [Fact]
     public async Task GetUser_HateoasResponse_ShouldIncludeCacheHeaders()
@@ -59,10 +23,10 @@ public class HateoasCachingIntegrationTests : IClassFixture<WebApplicationFactor
         // Arrange
         var userId = await CreateTestUserAsync();
         var token = await GetValidJwtTokenAsync();
-        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        HttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         // Act
-        var response = await _client.GetAsync($"/api/v1/users/{userId}");
+        var response = await HttpClient.GetAsync($"/api/v1/users/{userId}");
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -92,10 +56,10 @@ public class HateoasCachingIntegrationTests : IClassFixture<WebApplicationFactor
         await CreateTestUserAsync("user1@example.com", "User One");
         await CreateTestUserAsync("user2@example.com", "User Two");
         var token = await GetValidJwtTokenAsync();
-        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        HttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         // Act
-        var response = await _client.GetAsync("/api/v1/users?pageSize=1");
+        var response = await HttpClient.GetAsync("/api/v1/users?pageSize=1");
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -141,10 +105,10 @@ public class HateoasCachingIntegrationTests : IClassFixture<WebApplicationFactor
         // Arrange
         var userId = await CreateTestUserAsync();
         var token = await GetValidJwtTokenAsync();
-        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        HttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         // Get initial response to capture ETag
-        var initialResponse = await _client.GetAsync($"/api/v1/users/{userId}");
+        var initialResponse = await HttpClient.GetAsync($"/api/v1/users/{userId}");
         var etag = initialResponse.Headers.ETag!.Tag;
 
         // Act - Request with If-None-Match header
@@ -152,7 +116,7 @@ public class HateoasCachingIntegrationTests : IClassFixture<WebApplicationFactor
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         request.Headers.IfNoneMatch.Add(new EntityTagHeaderValue(etag));
 
-        var response = await _client.SendAsync(request);
+        var response = await HttpClient.SendAsync(request);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.NotModified);
@@ -172,10 +136,10 @@ public class HateoasCachingIntegrationTests : IClassFixture<WebApplicationFactor
         // Arrange
         await CreateTestUserAsync("searchable@example.com", "Searchable User");
         var token = await GetValidJwtTokenAsync();
-        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        HttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         // Act
-        var response = await _client.GetAsync("/api/v1/users/search?searchTerm=Searchable");
+        var response = await HttpClient.GetAsync("/api/v1/users/search?searchTerm=Searchable");
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -202,10 +166,10 @@ public class HateoasCachingIntegrationTests : IClassFixture<WebApplicationFactor
         // Arrange
         var userId = await CreateTestUserAsync();
         var token = await GetValidJwtTokenAsync();
-        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        HttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         // Get current ETag for conditional update
-        var getResponse = await _client.GetAsync($"/api/v1/users/{userId}");
+        var getResponse = await HttpClient.GetAsync($"/api/v1/users/{userId}");
         var etag = getResponse.Headers.ETag!.Tag;
 
         var updateRequest = new UpdateUserProfileRequest(
@@ -225,7 +189,7 @@ public class HateoasCachingIntegrationTests : IClassFixture<WebApplicationFactor
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         request.Headers.IfMatch.Add(new EntityTagHeaderValue(etag));
 
-        var response = await _client.SendAsync(request);
+        var response = await HttpClient.SendAsync(request);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -249,68 +213,44 @@ public class HateoasCachingIntegrationTests : IClassFixture<WebApplicationFactor
 
     private async Task<Guid> CreateTestUserAsync(string email = "test@example.com", string displayName = "Test User")
     {
-        using var scope = _factory.Services.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
-        var user = new ModernAPI.Domain.Entities.User(
-            new ModernAPI.Domain.ValueObjects.Email(email),
+        var registerRequest = new RegisterRequest(
+            email,
             displayName,
             "Test",
-            "User"
+            "User",
+            "TestPassword123!",
+            "TestPassword123!"
         );
 
-        context.Users.Add(user);
-        await context.SaveChangesAsync();
-        
-        return user.Id;
-    }
+        var response = await PostAsJsonAsync("/api/v1/auth/register", registerRequest);
+        response.EnsureSuccessStatusCode();
 
+        var content = await response.Content.ReadAsStringAsync();
+        var authResponse = JsonSerializer.Deserialize<AuthResponse>(content, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+        
+        return authResponse!.User.Id;
+    }
+    
     private async Task<string> GetValidJwtTokenAsync()
     {
-        var registerRequest = new
-        {
-            Email = "test@example.com",
-            DisplayName = "Test User",
-            FirstName = "Test",
-            LastName = "User",
-            Password = "TestPassword123!",
-            ConfirmPassword = "TestPassword123!"
-        };
+        var loginRequest = new LoginRequest(
+            "test@example.com",
+            "TestPassword123!",
+            false
+        );
 
-        var registerJson = JsonSerializer.Serialize(registerRequest, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
-        var registerContent = new StringContent(registerJson, Encoding.UTF8, "application/json");
-
-        try
+        var response = await PostAsJsonAsync("/api/v1/auth/login", loginRequest);
+        if (!response.IsSuccessStatusCode)
         {
-            await _client.PostAsync("/api/v1/auth/register", registerContent);
+            // User might not exist, create it first
+            await CreateTestUserAsync();
+            response = await PostAsJsonAsync("/api/v1/auth/login", loginRequest);
         }
-        catch
-        {
-            // User might already exist, ignore registration errors
-        }
-
-        var loginRequest = new
-        {
-            Email = "test@example.com",
-            Password = "TestPassword123!"
-        };
-
-        var loginJson = JsonSerializer.Serialize(loginRequest, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
-        var loginContent = new StringContent(loginJson, Encoding.UTF8, "application/json");
-
-        var loginResponse = await _client.PostAsync("/api/v1/auth/login", loginContent);
-        loginResponse.EnsureSuccessStatusCode();
-
-        var loginResponseContent = await loginResponse.Content.ReadAsStringAsync();
-        var loginResult = JsonSerializer.Deserialize<JsonElement>(loginResponseContent);
         
-        return loginResult.GetProperty("token").GetString() ?? throw new InvalidOperationException("Failed to get token");
-    }
-
-    public void Dispose()
-    {
-        _client.Dispose();
-        _factory.Dispose();
-        GC.SuppressFinalize(this);
+        response.EnsureSuccessStatusCode();
+        var content = await response.Content.ReadAsStringAsync();
+        var authResponse = JsonSerializer.Deserialize<AuthResponse>(content, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+        
+        return authResponse!.AccessToken;
     }
 }

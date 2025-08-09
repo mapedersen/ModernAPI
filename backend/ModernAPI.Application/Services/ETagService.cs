@@ -151,7 +151,7 @@ public class ETagService : IETagService
 
     public string? ParseETagHeader(string? etagHeader)
     {
-        if (string.IsNullOrEmpty(etagHeader))
+        if (string.IsNullOrWhiteSpace(etagHeader))
             return null;
 
         var etag = etagHeader.Trim();

@@ -97,15 +97,17 @@ public class PatchUserProfileRequest
 
     /// <summary>
     /// Converts the patch request to an UpdateUserProfileRequest for processing.
+    /// Note: This assumes all properties have been properly set by patch operations.
+    /// Null values indicate the property was removed/set to null by patch operations.
     /// </summary>
-    /// <param name="currentUser">Current user data to fill in missing values</param>
+    /// <param name="currentUser">Current user data (not used - patch target already has correct values)</param>
     /// <returns>An UpdateUserProfileRequest</returns>
     public UpdateUserProfileRequest ToUpdateRequest(UserDto currentUser)
     {
         return new UpdateUserProfileRequest(
-            DisplayName ?? currentUser.DisplayName,
-            FirstName ?? currentUser.FirstName,
-            LastName ?? currentUser.LastName
+            DisplayName ?? currentUser.DisplayName, // DisplayName is required, fall back if null
+            FirstName, // Use patched value directly (null if removed)
+            LastName   // Use patched value directly (null if removed)
         );
     }
 }

@@ -1,11 +1,6 @@
 using FluentAssertions;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using ModernAPI.Application.DTOs;
-using ModernAPI.Infrastructure.Data;
+using ModernAPI.IntegrationTests.Common;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
@@ -18,43 +13,9 @@ namespace ModernAPI.IntegrationTests.Controllers;
 /// Integration tests for HTTP caching functionality in the Users API.
 /// Tests ETag generation, conditional requests, and Cache-Control headers.
 /// </summary>
-public class UsersCachingIntegrationTests : IClassFixture<WebApplicationFactory<Program>>, IDisposable
+public class UsersCachingIntegrationTests : IntegrationTestBase
 {
-    private readonly WebApplicationFactory<Program> _factory;
-    private readonly HttpClient _client;
-    private readonly string _testDbName;
 
-    public UsersCachingIntegrationTests(WebApplicationFactory<Program> factory)
-    {
-        _testDbName = $"TestDb_Caching_{Guid.NewGuid()}";
-
-        _factory = factory.WithWebHostBuilder(builder =>
-        {
-            builder.UseEnvironment("Testing");
-            builder.ConfigureServices(services =>
-            {
-                // Remove the existing DbContext registration
-                var descriptor = services.SingleOrDefault(
-                    d => d.ServiceType == typeof(DbContextOptions<ApplicationDbContext>));
-                if (descriptor != null)
-                    services.Remove(descriptor);
-
-                // Add in-memory database for testing
-                services.AddDbContext<ApplicationDbContext>(options =>
-                {
-                    options.UseInMemoryDatabase(_testDbName);
-                });
-
-                // Ensure the database is created
-                var serviceProvider = services.BuildServiceProvider();
-                using var scope = serviceProvider.CreateScope();
-                var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-                context.Database.EnsureCreated();
-            });
-        });
-
-        _client = _factory.CreateClient();
-    }
 
     [Fact]
     public async Task GetUser_ShouldSetETagAndCacheControlHeaders()
@@ -62,10 +23,10 @@ public class UsersCachingIntegrationTests : IClassFixture<WebApplicationFactory<
         // Arrange
         var userId = await CreateTestUserAsync();
         var token = await GetValidJwtTokenAsync();
-        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        HttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         // Act
-        var response = await _client.GetAsync($"/api/v1/users/{userId}");
+        var response = await HttpClient.GetAsync($"/api/v1/users/{userId}");
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -93,10 +54,10 @@ public class UsersCachingIntegrationTests : IClassFixture<WebApplicationFactory<
         // Arrange
         var userId = await CreateTestUserAsync();
         var token = await GetValidJwtTokenAsync();
-        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        HttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         // Get the initial response to capture ETag
-        var initialResponse = await _client.GetAsync($"/api/v1/users/{userId}");
+        var initialResponse = await HttpClient.GetAsync($"/api/v1/users/{userId}");
         initialResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         var etag = initialResponse.Headers.ETag!.Tag;
 
@@ -105,7 +66,7 @@ public class UsersCachingIntegrationTests : IClassFixture<WebApplicationFactory<
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         request.Headers.IfNoneMatch.Add(new EntityTagHeaderValue(etag));
 
-        var response = await _client.SendAsync(request);
+        var response = await HttpClient.SendAsync(request);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.NotModified);
@@ -122,10 +83,10 @@ public class UsersCachingIntegrationTests : IClassFixture<WebApplicationFactory<
         // Arrange
         var userId = await CreateTestUserAsync();
         var token = await GetValidJwtTokenAsync();
-        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        HttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         // Get the initial response to capture Last-Modified
-        var initialResponse = await _client.GetAsync($"/api/v1/users/{userId}");
+        var initialResponse = await HttpClient.GetAsync($"/api/v1/users/{userId}");
         initialResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         var lastModified = initialResponse.Content.Headers.LastModified!.Value;
 
@@ -134,7 +95,7 @@ public class UsersCachingIntegrationTests : IClassFixture<WebApplicationFactory<
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         request.Headers.IfModifiedSince = lastModified;
 
-        var response = await _client.SendAsync(request);
+        var response = await HttpClient.SendAsync(request);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.NotModified);
@@ -148,10 +109,10 @@ public class UsersCachingIntegrationTests : IClassFixture<WebApplicationFactory<
         await CreateTestUserAsync();
         await CreateTestUserAsync("test2@example.com", "Test User 2");
         var token = await GetValidJwtTokenAsync();
-        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        HttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         // Act
-        var response = await _client.GetAsync("/api/v1/users");
+        var response = await HttpClient.GetAsync("/api/v1/users");
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -175,10 +136,10 @@ public class UsersCachingIntegrationTests : IClassFixture<WebApplicationFactory<
         // Arrange
         await CreateTestUserAsync();
         var token = await GetValidJwtTokenAsync();
-        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        HttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         // Get initial collection response
-        var initialResponse = await _client.GetAsync("/api/v1/users");
+        var initialResponse = await HttpClient.GetAsync("/api/v1/users");
         initialResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         var etag = initialResponse.Headers.ETag!.Tag;
 
@@ -187,7 +148,7 @@ public class UsersCachingIntegrationTests : IClassFixture<WebApplicationFactory<
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         request.Headers.IfNoneMatch.Add(new EntityTagHeaderValue(etag));
 
-        var response = await _client.SendAsync(request);
+        var response = await HttpClient.SendAsync(request);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.NotModified);
@@ -199,10 +160,10 @@ public class UsersCachingIntegrationTests : IClassFixture<WebApplicationFactory<
         // Arrange
         await CreateTestUserAsync("searchtest@example.com", "Searchable User");
         var token = await GetValidJwtTokenAsync();
-        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        HttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         // Act
-        var response = await _client.GetAsync("/api/v1/users/search?searchTerm=Searchable");
+        var response = await HttpClient.GetAsync("/api/v1/users/search?searchTerm=Searchable");
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -223,10 +184,10 @@ public class UsersCachingIntegrationTests : IClassFixture<WebApplicationFactory<
         // Arrange
         var userId = await CreateTestUserAsync();
         var token = await GetValidJwtTokenAsync();
-        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        HttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         // Get current user state and ETag
-        var getResponse = await _client.GetAsync($"/api/v1/users/{userId}");
+        var getResponse = await HttpClient.GetAsync($"/api/v1/users/{userId}");
         getResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         var etag = getResponse.Headers.ETag!.Tag;
 
@@ -247,7 +208,7 @@ public class UsersCachingIntegrationTests : IClassFixture<WebApplicationFactory<
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         request.Headers.IfMatch.Add(new EntityTagHeaderValue(etag));
 
-        var response = await _client.SendAsync(request);
+        var response = await HttpClient.SendAsync(request);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -264,7 +225,7 @@ public class UsersCachingIntegrationTests : IClassFixture<WebApplicationFactory<
         // Arrange
         var userId = await CreateTestUserAsync();
         var token = await GetValidJwtTokenAsync();
-        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        HttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         var updateRequest = new UpdateUserProfileRequest(
             DisplayName: "Updated Display Name",
@@ -283,7 +244,7 @@ public class UsersCachingIntegrationTests : IClassFixture<WebApplicationFactory<
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         request.Headers.IfMatch.Add(new EntityTagHeaderValue("\"outdated-etag\""));
 
-        var response = await _client.SendAsync(request);
+        var response = await HttpClient.SendAsync(request);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.PreconditionFailed);
@@ -298,10 +259,10 @@ public class UsersCachingIntegrationTests : IClassFixture<WebApplicationFactory<
         // Arrange
         var userId = await CreateTestUserAsync();
         var token = await GetValidJwtTokenAsync();
-        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        HttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         // Get current user state and ETag
-        var getResponse = await _client.GetAsync($"/api/v1/users/{userId}");
+        var getResponse = await HttpClient.GetAsync($"/api/v1/users/{userId}");
         var etag = getResponse.Headers.ETag!.Tag;
 
         var patchDocument = @"[
@@ -317,7 +278,7 @@ public class UsersCachingIntegrationTests : IClassFixture<WebApplicationFactory<
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         request.Headers.IfMatch.Add(new EntityTagHeaderValue(etag));
 
-        var response = await _client.SendAsync(request);
+        var response = await HttpClient.SendAsync(request);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -332,10 +293,10 @@ public class UsersCachingIntegrationTests : IClassFixture<WebApplicationFactory<
         // Arrange
         var userId = await CreateTestUserAsync();
         var token = await GetValidJwtTokenAsync();
-        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        HttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         // Act
-        var response = await _client.GetAsync("/api/v1/users/me");
+        var response = await HttpClient.GetAsync("/api/v1/users/me");
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -355,10 +316,10 @@ public class UsersCachingIntegrationTests : IClassFixture<WebApplicationFactory<
         // Arrange
         var userId = await CreateTestUserAsync();
         var token = await GetValidJwtTokenAsync();
-        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        HttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         // Act
-        var response = await _client.GetAsync($"/api/v1/users/{userId}");
+        var response = await HttpClient.GetAsync($"/api/v1/users/{userId}");
 
         // Assert
         response.Headers.Vary.Should().Contain("Authorization");
@@ -366,71 +327,44 @@ public class UsersCachingIntegrationTests : IClassFixture<WebApplicationFactory<
 
     private async Task<Guid> CreateTestUserAsync(string email = "test@example.com", string displayName = "Test User")
     {
-        using var scope = _factory.Services.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
-        var user = new ModernAPI.Domain.Entities.User(
-            new ModernAPI.Domain.ValueObjects.Email(email),
+        var registerRequest = new RegisterRequest(
+            email,
             displayName,
             "Test",
-            "User"
+            "User",
+            "TestPassword123!",
+            "TestPassword123!"
         );
 
-        context.Users.Add(user);
-        await context.SaveChangesAsync();
-        
-        return user.Id;
-    }
+        var response = await PostAsJsonAsync("/api/v1/auth/register", registerRequest);
+        response.EnsureSuccessStatusCode();
 
+        var content = await response.Content.ReadAsStringAsync();
+        var authResponse = System.Text.Json.JsonSerializer.Deserialize<AuthResponse>(content, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+        
+        return authResponse!.User.Id;
+    }
+    
     private async Task<string> GetValidJwtTokenAsync()
     {
-        // Create a test login request
-        var loginRequest = new
-        {
-            Email = "test@example.com",
-            Password = "TestPassword123!"
-        };
+        var loginRequest = new LoginRequest(
+            "test@example.com",
+            "TestPassword123!",
+            false
+        );
 
-        // First create the user through the auth system
-        var registerRequest = new
+        var response = await PostAsJsonAsync("/api/v1/auth/login", loginRequest);
+        if (!response.IsSuccessStatusCode)
         {
-            Email = "test@example.com",
-            DisplayName = "Test User",
-            FirstName = "Test",
-            LastName = "User",
-            Password = "TestPassword123!",
-            ConfirmPassword = "TestPassword123!"
-        };
-
-        var registerJson = JsonSerializer.Serialize(registerRequest, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
-        var registerContent = new StringContent(registerJson, Encoding.UTF8, "application/json");
-
-        try
-        {
-            await _client.PostAsync("/api/v1/auth/register", registerContent);
+            // User might not exist, create it first
+            await CreateTestUserAsync();
+            response = await PostAsJsonAsync("/api/v1/auth/login", loginRequest);
         }
-        catch
-        {
-            // User might already exist, ignore registration errors
-        }
-
-        // Now login to get the token
-        var loginJson = JsonSerializer.Serialize(loginRequest, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
-        var loginContent = new StringContent(loginJson, Encoding.UTF8, "application/json");
-
-        var loginResponse = await _client.PostAsync("/api/v1/auth/login", loginContent);
-        loginResponse.EnsureSuccessStatusCode();
-
-        var loginResponseContent = await loginResponse.Content.ReadAsStringAsync();
-        var loginResult = JsonSerializer.Deserialize<JsonElement>(loginResponseContent);
         
-        return loginResult.GetProperty("token").GetString() ?? throw new InvalidOperationException("Failed to get token");
-    }
-
-    public void Dispose()
-    {
-        _client.Dispose();
-        _factory.Dispose();
-        GC.SuppressFinalize(this);
+        response.EnsureSuccessStatusCode();
+        var content = await response.Content.ReadAsStringAsync();
+        var authResponse = System.Text.Json.JsonSerializer.Deserialize<AuthResponse>(content, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+        
+        return authResponse!.AccessToken;
     }
 }
