@@ -19,6 +19,34 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: modernapi-redis
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-dev_redis_password}
+    command: >
+      sh -c '
+        mkdir -p /usr/local/etc/redis &&
+        echo "requirepass $$REDIS_PASSWORD" > /usr/local/etc/redis/redis.conf &&
+        echo "appendonly yes" >> /usr/local/etc/redis/redis.conf &&
+        echo "appendfsync everysec" >> /usr/local/etc/redis/redis.conf &&
+        echo "maxmemory 256mb" >> /usr/local/etc/redis/redis.conf &&
+        echo "maxmemory-policy allkeys-lru" >> /usr/local/etc/redis/redis.conf &&
+        redis-server /usr/local/etc/redis/redis.conf
+      '
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a $$REDIS_PASSWORD ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   postgres_data:
+    driver: local
+  redis_data:
     driver: local

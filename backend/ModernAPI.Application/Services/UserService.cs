@@ -1,5 +1,6 @@
 using AutoMapper;
 using FluentValidation;
+using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.Extensions.Logging;
 using ModernAPI.Application.Common.Exceptions;
 using ModernAPI.Application.DTOs;
@@ -154,6 +155,48 @@ public class UserService : IUserService
     }
 
     /// <inheritdoc />
+    public async Task<UserResponse> PatchUserProfileAsync(Guid userId, JsonPatchDocument<PatchUserProfileRequest> patchDocument, CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Applying patch operations to user profile: {UserId}", userId);
+
+        // Get the current user
+        var currentUser = await GetUserByIdAsync(userId, cancellationToken);
+        
+        // Create a patch target with current values
+        var patchTarget = new PatchUserProfileRequest
+        {
+            DisplayName = currentUser.DisplayName,
+            FirstName = currentUser.FirstName,
+            LastName = currentUser.LastName
+        };
+
+        // Validate patch document operations
+        ValidatePatchOperations(patchDocument);
+
+        // Apply the patch operations
+        try
+        {
+            patchDocument.ApplyTo(patchTarget);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning("Failed to apply patch operations for user {UserId}: {Error}", userId, ex.Message);
+            throw new Common.Exceptions.ValidationException("PatchOperations", $"Invalid patch operations: {ex.Message}");
+        }
+
+        // Validate the resulting object
+        if (!patchTarget.IsValid())
+        {
+            _logger.LogWarning("Patch operations resulted in invalid data for user {UserId}", userId);
+            throw new Common.Exceptions.ValidationException("PatchResult", "The patch operations resulted in invalid user data");
+        }
+
+        // Convert to standard update request and apply
+        var updateRequest = patchTarget.ToUpdateRequest(currentUser);
+        return await UpdateUserProfileAsync(userId, updateRequest, cancellationToken);
+    }
+
+    /// <inheritdoc />
     public async Task<UserResponse> ChangeUserEmailAsync(Guid userId, ChangeUserEmailRequest request, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Changing email for user: {UserId} to {NewEmail}", userId, request.NewEmail);
@@ -268,4 +311,51 @@ public class UserService : IUserService
 
         return user;
     }
+
+    /// <summary>
+    /// Validates JSON Patch operations for security and business rules.
+    /// Ensures only allowed operations on permitted properties are allowed.
+    /// </summary>
+    /// <param name="patchDocument">The patch document to validate</param>
+    /// <exception cref="ValidationException">Thrown when patch operations are invalid</exception>
+    private static void ValidatePatchOperations<T>(JsonPatchDocument<T> patchDocument) where T : class
+    {
+        var allowedOperations = new[] { "replace", "add", "remove" };
+        var allowedPaths = new[] { "/displayname", "/firstname", "/lastname" };
+
+        foreach (var operation in patchDocument.Operations)
+        {
+            // Check if operation type is allowed
+            if (!allowedOperations.Contains(operation.op.ToLower()))
+            {
+                throw new Common.Exceptions.ValidationException("Operation", $"Operation '{operation.op}' is not allowed");
+            }
+
+            // Check if path is allowed (case-insensitive)
+            if (!allowedPaths.Contains(operation.path.ToLower()))
+            {
+                throw new Common.Exceptions.ValidationException("Path", $"Path '{operation.path}' is not allowed for patching");
+            }
+
+            // Additional validation for specific operations
+            switch (operation.op.ToLower())
+            {
+                case "replace":
+                case "add":
+                    if (operation.value == null && operation.path.ToLower() == "/displayname")
+                    {
+                        throw new Common.Exceptions.ValidationException("DisplayName", "DisplayName cannot be null");
+                    }
+                    break;
+                
+                case "remove":
+                    if (operation.path.ToLower() == "/displayname")
+                    {
+                        throw new Common.Exceptions.ValidationException("DisplayName", "DisplayName cannot be removed");
+                    }
+                    break;
+            }
+        }
+    }
+
 }

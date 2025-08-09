@@ -1,0 +1,43 @@
+namespace {{Namespace}}.Application.DTOs;
+
+/// <summary>
+/// {{Name}} DTOs - Generated on {{GeneratedAt}}
+/// </summary>
+
+public record {{Name}}Dto(
+    Guid Id,
+    {{#each Properties}}
+    {{Type}} {{Name}}{{#unless @last}},{{/unless}}
+    {{/each}},
+    DateTime CreatedAt,
+    DateTime UpdatedAt
+);
+
+public record Create{{Name}}Request(
+    {{#each Properties}}
+    {{#unless IsForeignKey}}
+    {{Type}} {{Name}}{{#unless @last}},{{/unless}}
+    {{/unless}}
+    {{/each}}
+);
+
+public record Update{{Name}}Request(
+    {{#each Properties}}
+    {{#unless IsForeignKey}}
+    {{Type}} {{Name}}{{#unless @last}},{{/unless}}
+    {{/unless}}
+    {{/each}}
+);
+
+public record {{Name}}ListDto(
+    Guid Id,
+    {{#each Properties}}
+    {{#if @first}}
+    {{Type}} {{Name}},
+    {{/if}}
+    {{#if @last}}
+    {{Type}} {{Name}},
+    {{/if}}
+    {{/each}}
+    DateTime CreatedAt
+);

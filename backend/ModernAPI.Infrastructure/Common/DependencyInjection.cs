@@ -1,9 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using ModernAPI.Application.Interfaces;
 using ModernAPI.Domain.Interfaces;
 using ModernAPI.Infrastructure.Data;
 using ModernAPI.Infrastructure.Repositories;
+using ModernAPI.Infrastructure.Services;
 
 namespace ModernAPI.Infrastructure.Common;
 
@@ -27,6 +29,9 @@ public static class DependencyInjection
 
         // Register repositories and Unit of Work
         services.AddRepositories();
+
+        // Register infrastructure services
+        services.AddScoped<IPasswordService, PasswordService>();
 
         // Register other infrastructure services as they are added
         // services.AddCaching(configuration);
@@ -94,6 +99,7 @@ public static class DependencyInjection
 
         // Register individual repositories
         services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 
         // Future repositories would be registered here:
         // services.AddScoped<IProductRepository, ProductRepository>();

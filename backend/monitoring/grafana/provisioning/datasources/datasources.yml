@@ -1,0 +1,35 @@
+apiVersion: 1
+
+datasources:
+  # Prometheus datasource
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: true
+    jsonData:
+      timeInterval: '15s'
+
+  # Seq datasource (using Simple JSON plugin)
+  - name: Seq
+    type: simplejson
+    access: proxy
+    url: http://seq:5341
+    editable: true
+    jsonData:
+      tlsSkipVerify: true
+
+  # Jaeger datasource (if using distributed tracing)
+  - name: Jaeger
+    type: jaeger
+    access: proxy
+    url: http://jaeger:16686
+    editable: true
+
+  # OpenTelemetry datasource (if needed)
+  # - name: OpenTelemetry
+  #   type: prometheus
+  #   access: proxy
+  #   url: http://otel-collector:8889
+  #   editable: true

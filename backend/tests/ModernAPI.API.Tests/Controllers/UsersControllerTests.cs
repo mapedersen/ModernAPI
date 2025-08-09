@@ -1,11 +1,13 @@
 using FluentAssertions;
 using Xunit;
+using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using ModernAPI.API.Controllers;
 using ModernAPI.API.Tests.Common;
 using ModernAPI.Application.Common.Exceptions;
 using ModernAPI.Application.DTOs;
+using ModernAPI.API.Services;
 using Moq;
 
 namespace ModernAPI.API.Tests.Controllers;
@@ -17,11 +19,13 @@ public class UsersControllerTests : ApiTestBase
 {
     private readonly UsersController _controller;
     private readonly Mock<ILogger<UsersController>> _mockLogger;
+    private readonly Mock<ILinkGenerator> _mockLinkGenerator;
 
     public UsersControllerTests()
     {
-        _mockLogger = MockLogger<UsersController>();
-        _controller = new UsersController(MockUserService.Object, _mockLogger.Object);
+        _mockLogger = CreateMockLogger<UsersController>();
+        _mockLinkGenerator = new Mock<ILinkGenerator>();
+        _controller = new UsersController(MockUserService.Object, _mockLogger.Object, _mockLinkGenerator.Object);
     }
 
     [Fact]
@@ -36,8 +40,8 @@ public class UsersControllerTests : ApiTestBase
         var result = await _controller.CreateUser(request);
 
         // Assert
-        result.Should().BeOfType<CreatedAtActionResult>();
-        var createdResult = result as CreatedAtActionResult;
+        result.Result.Should().BeOfType<CreatedAtActionResult>();
+        var createdResult = result.Result as CreatedAtActionResult;
         createdResult!.StatusCode.Should().Be(201);
         createdResult.Value.Should().BeEquivalentTo(response);
         createdResult.ActionName.Should().Be(nameof(UsersController.GetUser));
@@ -66,7 +70,6 @@ public class UsersControllerTests : ApiTestBase
         // Arrange
         var userId = Guid.NewGuid();
         var userDto = CreateValidUserDto();
-        userDto.Id = userId;
         SetupUserServiceGetById(userId, userDto);
         
         var authenticatedUser = CreateAuthenticatedUser(userId.ToString(), userDto.Email);
@@ -76,8 +79,8 @@ public class UsersControllerTests : ApiTestBase
         var result = await _controller.GetUser(userId);
 
         // Assert
-        result.Should().BeOfType<OkObjectResult>();
-        var okResult = result as OkObjectResult;
+        result.Result.Should().BeOfType<OkObjectResult>();
+        var okResult = result.Result as OkObjectResult;
         okResult!.StatusCode.Should().Be(200);
         okResult.Value.Should().BeEquivalentTo(userDto);
     }
@@ -107,7 +110,6 @@ public class UsersControllerTests : ApiTestBase
         // Arrange
         var userId = Guid.NewGuid();
         var userDto = CreateValidUserDto();
-        userDto.Id = userId;
         SetupUserServiceGetById(userId, userDto);
         
         var authenticatedUser = CreateAuthenticatedUser(userId.ToString(), userDto.Email);
@@ -117,11 +119,11 @@ public class UsersControllerTests : ApiTestBase
         var result = await _controller.GetCurrentUser();
 
         // Assert
-        result.Should().BeOfType<OkObjectResult>();
-        var okResult = result as OkObjectResult;
+        result.Result.Should().BeOfType<OkObjectResult>();
+        var okResult = result.Result as OkObjectResult;
         okResult!.Value.Should().BeEquivalentTo(userDto);
         
-        VerifyUserServiceGetByIdWasCalled(userId, Times.Once);
+        VerifyUserServiceGetByIdWasCalled(userId, Times.Once());
     }
 
     [Fact]
@@ -157,8 +159,8 @@ public class UsersControllerTests : ApiTestBase
         var result = await _controller.UpdateUser(userId, request);
 
         // Assert
-        result.Should().BeOfType<OkObjectResult>();
-        var okResult = result as OkObjectResult;
+        result.Result.Should().BeOfType<OkObjectResult>();
+        var okResult = result.Result as OkObjectResult;
         okResult!.Value.Should().BeEquivalentTo(response);
     }
 
@@ -200,8 +202,8 @@ public class UsersControllerTests : ApiTestBase
         var result = await _controller.UpdateUser(userId, request);
 
         // Assert
-        result.Should().BeOfType<OkObjectResult>();
-        var okResult = result as OkObjectResult;
+        result.Result.Should().BeOfType<OkObjectResult>();
+        var okResult = result.Result as OkObjectResult;
         okResult!.Value.Should().BeEquivalentTo(response);
     }
 
@@ -221,8 +223,8 @@ public class UsersControllerTests : ApiTestBase
         var result = await _controller.GetUsers(page: 1, pageSize: 20, includeInactive: false);
 
         // Assert
-        result.Should().BeOfType<OkObjectResult>();
-        var okResult = result as OkObjectResult;
+        result.Result.Should().BeOfType<OkObjectResult>();
+        var okResult = result.Result as OkObjectResult;
         okResult!.Value.Should().BeEquivalentTo(userListDto);
     }
 
@@ -243,12 +245,221 @@ public class UsersControllerTests : ApiTestBase
         var result = await _controller.SearchUsers(searchTerm, page: 1, pageSize: 20, includeInactive: false);
 
         // Assert
-        result.Should().BeOfType<OkObjectResult>();
-        var okResult = result as OkObjectResult;
+        result.Result.Should().BeOfType<OkObjectResult>();
+        var okResult = result.Result as OkObjectResult;
         okResult!.Value.Should().BeEquivalentTo(userListDto);
         
         MockUserService.Verify(x => x.SearchUsersAsync(
             It.Is<SearchUsersRequest>(r => r.SearchTerm == searchTerm), 
             It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task PatchUser_WithValidPatchDocument_ShouldReturnOkResult()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var patchDocument = new JsonPatchDocument<PatchUserProfileRequest>();
+        patchDocument.Replace(x => x.DisplayName, "Updated Display Name");
+        
+        var response = CreateValidUserResponse();
+        
+        MockUserService
+            .Setup(x => x.PatchUserProfileAsync(userId, It.IsAny<JsonPatchDocument<PatchUserProfileRequest>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(response);
+        
+        var authenticatedUser = CreateAuthenticatedUser(userId.ToString(), "user@test.com");
+        SetupControllerUser(_controller, authenticatedUser);
+
+        // Act
+        var result = await _controller.PatchUser(userId, patchDocument);
+
+        // Assert
+        result.Result.Should().BeOfType<OkObjectResult>();
+        var okResult = result.Result as OkObjectResult;
+        okResult!.Value.Should().BeEquivalentTo(response);
+        
+        MockUserService.Verify(x => x.PatchUserProfileAsync(
+            userId, 
+            It.IsAny<JsonPatchDocument<PatchUserProfileRequest>>(), 
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task PatchUser_WithNullPatchDocument_ShouldReturnBadRequest()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        JsonPatchDocument<PatchUserProfileRequest>? patchDocument = null;
+        
+        var authenticatedUser = CreateAuthenticatedUser(userId.ToString(), "user@test.com");
+        SetupControllerUser(_controller, authenticatedUser);
+
+        // Act
+        var result = await _controller.PatchUser(userId, patchDocument!);
+
+        // Assert
+        result.Result.Should().BeOfType<BadRequestObjectResult>();
+        var badRequestResult = result.Result as BadRequestObjectResult;
+        badRequestResult!.StatusCode.Should().Be(400);
+        badRequestResult.Value.Should().Be("Patch document cannot be null or empty");
+    }
+
+    [Fact]
+    public async Task PatchUser_WithEmptyPatchDocument_ShouldReturnBadRequest()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var patchDocument = new JsonPatchDocument<PatchUserProfileRequest>();
+        
+        var authenticatedUser = CreateAuthenticatedUser(userId.ToString(), "user@test.com");
+        SetupControllerUser(_controller, authenticatedUser);
+
+        // Act
+        var result = await _controller.PatchUser(userId, patchDocument);
+
+        // Assert
+        result.Result.Should().BeOfType<BadRequestObjectResult>();
+        var badRequestResult = result.Result as BadRequestObjectResult;
+        badRequestResult!.StatusCode.Should().Be(400);
+        badRequestResult.Value.Should().Be("Patch document cannot be null or empty");
+    }
+
+    [Fact]
+    public async Task PatchUser_WithDifferentUserAndNoAdminRole_ShouldThrowUnauthorizedAccessException()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var differentUserId = Guid.NewGuid();
+        var patchDocument = new JsonPatchDocument<PatchUserProfileRequest>();
+        patchDocument.Replace(x => x.DisplayName, "Updated Display Name");
+        
+        var authenticatedUser = CreateAuthenticatedUser(differentUserId.ToString(), "user@test.com");
+        SetupControllerUser(_controller, authenticatedUser);
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(() => 
+            _controller.PatchUser(userId, patchDocument));
+        
+        exception.Message.Should().Contain("can only access your own resources");
+    }
+
+    [Fact]
+    public async Task PatchUser_WithDifferentUserButAdminRole_ShouldReturnOkResult()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var adminUserId = Guid.NewGuid();
+        var patchDocument = new JsonPatchDocument<PatchUserProfileRequest>();
+        patchDocument.Replace(x => x.DisplayName, "Updated Display Name");
+        
+        var response = CreateValidUserResponse();
+        
+        MockUserService
+            .Setup(x => x.PatchUserProfileAsync(userId, It.IsAny<JsonPatchDocument<PatchUserProfileRequest>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(response);
+        
+        var adminUser = CreateAuthenticatedUser(adminUserId.ToString(), "admin@test.com", "Administrator");
+        SetupControllerUser(_controller, adminUser);
+
+        // Act
+        var result = await _controller.PatchUser(userId, patchDocument);
+
+        // Assert
+        result.Result.Should().BeOfType<OkObjectResult>();
+        var okResult = result.Result as OkObjectResult;
+        okResult!.Value.Should().BeEquivalentTo(response);
+    }
+
+    [Fact]
+    public async Task PatchCurrentUser_WithValidPatchDocument_ShouldReturnOkResult()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var patchDocument = new JsonPatchDocument<PatchUserProfileRequest>();
+        patchDocument.Replace(x => x.FirstName, "Updated First Name");
+        
+        var response = CreateValidUserResponse();
+        
+        MockUserService
+            .Setup(x => x.PatchUserProfileAsync(userId, It.IsAny<JsonPatchDocument<PatchUserProfileRequest>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(response);
+        
+        var authenticatedUser = CreateAuthenticatedUser(userId.ToString(), "user@test.com");
+        SetupControllerUser(_controller, authenticatedUser);
+
+        // Act
+        var result = await _controller.PatchCurrentUser(patchDocument);
+
+        // Assert
+        result.Result.Should().BeOfType<OkObjectResult>();
+        var okResult = result.Result as OkObjectResult;
+        okResult!.Value.Should().BeEquivalentTo(response);
+        
+        MockUserService.Verify(x => x.PatchUserProfileAsync(
+            userId, 
+            It.IsAny<JsonPatchDocument<PatchUserProfileRequest>>(), 
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task PatchCurrentUser_WithoutAuthentication_ShouldThrowUnauthorizedAccessException()
+    {
+        // Arrange
+        var patchDocument = new JsonPatchDocument<PatchUserProfileRequest>();
+        patchDocument.Replace(x => x.DisplayName, "Updated Display Name");
+        
+        var anonymousUser = CreateAnonymousUser();
+        SetupControllerUser(_controller, anonymousUser);
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(() => 
+            _controller.PatchCurrentUser(patchDocument));
+        
+        exception.Message.Should().Contain("User ID not found in token claims");
+    }
+
+    [Fact]
+    public async Task PatchUser_WhenServiceThrowsValidationException_ShouldLetGlobalHandlerProcess()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var patchDocument = new JsonPatchDocument<PatchUserProfileRequest>();
+        patchDocument.Replace(x => x.DisplayName, ""); // Invalid value
+        
+        MockUserService
+            .Setup(x => x.PatchUserProfileAsync(userId, It.IsAny<JsonPatchDocument<PatchUserProfileRequest>>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new ValidationException("PatchOperations", "Invalid patch operations"));
+        
+        var authenticatedUser = CreateAuthenticatedUser(userId.ToString(), "user@test.com");
+        SetupControllerUser(_controller, authenticatedUser);
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<ValidationException>(() => 
+            _controller.PatchUser(userId, patchDocument));
+        
+        exception.Message.Should().Contain("Invalid patch operations");
+    }
+
+    [Fact]
+    public async Task PatchUser_WhenServiceThrowsNotFoundException_ShouldLetGlobalHandlerProcess()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var patchDocument = new JsonPatchDocument<PatchUserProfileRequest>();
+        patchDocument.Replace(x => x.DisplayName, "Updated Name");
+        
+        MockUserService
+            .Setup(x => x.PatchUserProfileAsync(userId, It.IsAny<JsonPatchDocument<PatchUserProfileRequest>>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new NotFoundException("User", userId.ToString()));
+        
+        var authenticatedUser = CreateAuthenticatedUser(userId.ToString(), "user@test.com");
+        SetupControllerUser(_controller, authenticatedUser);
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<NotFoundException>(() => 
+            _controller.PatchUser(userId, patchDocument));
+        
+        exception.Should().NotBeNull();
     }
 }

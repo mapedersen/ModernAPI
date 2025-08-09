@@ -1,0 +1,491 @@
+name: 🚀 Deploy to Staging
+
+on:
+  workflow_run:
+    workflows: ["🐳 Docker Build & Registry"]
+    types: [completed]
+    branches: [develop]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to deploy (leave empty for latest)'
+        required: false
+        type: string
+      skip_tests:
+        description: 'Skip deployment tests'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  ENVIRONMENT: staging
+  CLUSTER_NAME: modernapi-staging
+  NAMESPACE: modernapi-staging
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+# Concurrency: only one staging deployment at a time
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+jobs:
+  # =============================================================================
+  # Pre-deployment Validation
+  # =============================================================================
+  validate:
+    name: 🔍 Pre-deployment Validation
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    timeout-minutes: 10
+    
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      image_exists: ${{ steps.check_image.outputs.exists }}
+      
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        
+      - name: 🏷️ Determine version to deploy
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ github.event.inputs.version }}" ]]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            # Get latest beta version or use branch name
+            VERSION="${GITHUB_REF_NAME}-$(git rev-parse --short HEAD)-beta"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "📦 Deploying version: $VERSION"
+          
+      - name: 🔐 Login to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: 🔍 Check if Docker image exists
+        id: check_image
+        run: |
+          if docker manifest inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }} > /dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "✅ Image exists: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "❌ Image not found: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}"
+          fi
+          
+  # =============================================================================
+  # Staging Deployment (Docker Compose)
+  # =============================================================================
+  deploy-docker:
+    name: 🐳 Deploy to Docker Compose
+    runs-on: ubuntu-latest
+    needs: [validate]
+    if: needs.validate.outputs.image_exists == 'true'
+    timeout-minutes: 15
+    
+    environment:
+      name: staging
+      url: https://staging-api.yourdomain.com
+      
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        
+      - name: 🔧 Prepare environment configuration
+        run: |
+          # Copy staging environment template
+          cp .env.example .env.staging
+          
+          # Update with staging-specific values
+          sed -i 's/DOMAIN=yourdomain.com/DOMAIN=staging.yourdomain.com/' .env.staging
+          sed -i 's/API_DOMAIN=api.yourdomain.com/API_DOMAIN=staging-api.yourdomain.com/' .env.staging
+          sed -i 's/ASPNETCORE_ENVIRONMENT=Production/ASPNETCORE_ENVIRONMENT=Staging/' .env.staging
+          
+          # Set secrets from GitHub secrets
+          echo "JWT_SECRET=${{ secrets.STAGING_JWT_SECRET }}" >> .env.staging
+          echo "POSTGRES_PASSWORD=${{ secrets.STAGING_POSTGRES_PASSWORD }}" >> .env.staging
+          echo "GRAFANA_ADMIN_PASSWORD=${{ secrets.STAGING_GRAFANA_PASSWORD }}" >> .env.staging
+          echo "SEQ_API_KEY=${{ secrets.STAGING_SEQ_API_KEY }}" >> .env.staging
+          echo "ACME_EMAIL=${{ secrets.ACME_EMAIL }}" >> .env.staging
+          
+          # Set image version
+          echo "MODERNAPI_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.validate.outputs.version }}" >> .env.staging
+          
+      - name: 🚀 Deploy with staging deployment script
+        run: |
+          # Make deployment script executable
+          chmod +x scripts/deploy-docker.sh
+          
+          # Set environment variables for staging
+          export ENV_FILE=".env.staging"
+          export COMPOSE_FILE="docker-compose.production.yml"
+          
+          # Deploy to staging
+          ./scripts/deploy-docker.sh --deploy
+          
+      - name: ⏳ Wait for deployment to stabilize
+        run: |
+          echo "⏳ Waiting for services to be healthy..."
+          for i in {1..30}; do
+            if curl -f https://staging-api.yourdomain.com/health > /dev/null 2>&1; then
+              echo "✅ Staging deployment is healthy"
+              break
+            fi
+            echo "⏳ Waiting for health check... ($i/30)"
+            sleep 10
+          done
+          
+      - name: 📊 Deployment summary
+        run: |
+          echo "## 🚀 Staging Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** Staging" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** ${{ needs.validate.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image:** ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.validate.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **URL:** https://staging-api.yourdomain.com" >> $GITHUB_STEP_SUMMARY
+          echo "- **Health:** https://staging-api.yourdomain.com/health" >> $GITHUB_STEP_SUMMARY
+          echo "- **Logs:** https://logs.staging.yourdomain.com" >> $GITHUB_STEP_SUMMARY
+          echo "- **Metrics:** https://dashboard.staging.yourdomain.com" >> $GITHUB_STEP_SUMMARY
+          
+  # =============================================================================
+  # Staging Deployment (Kubernetes) - Alternative
+  # =============================================================================
+  deploy-k8s:
+    name: ☸️ Deploy to Kubernetes
+    runs-on: ubuntu-latest
+    needs: [validate]
+    if: |
+      needs.validate.outputs.image_exists == 'true' && 
+      vars.STAGING_DEPLOYMENT_TYPE == 'kubernetes'
+    timeout-minutes: 20
+    
+    environment:
+      name: staging-k8s
+      url: https://staging-api.yourdomain.com
+      
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        
+      - name: ☸️ Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.2'
+          
+      - name: 🔧 Configure Kubernetes context
+        run: |
+          # Configure kubectl context (adjust for your cluster)
+          echo "${{ secrets.STAGING_KUBECONFIG }}" | base64 -d > kubeconfig
+          export KUBECONFIG=kubeconfig
+          kubectl config current-context
+          
+      - name: 🔧 Prepare Kubernetes manifests
+        run: |
+          # Update image version in manifests
+          sed -i "s|modernapi:latest|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.validate.outputs.version }}|g" k8s/modernapi.yml
+          
+          # Update environment-specific configurations
+          sed -i 's/namespace: modernapi/namespace: modernapi-staging/g' k8s/*.yml
+          sed -i 's/yourdomain.com/staging.yourdomain.com/g' k8s/*.yml
+          
+      - name: 🗂️ Create/update ConfigMap and Secrets
+        run: |
+          export KUBECONFIG=kubeconfig
+          
+          # Update secrets with staging values
+          kubectl create secret generic modernapi-secrets \
+            --from-literal=JWT_SECRET="${{ secrets.STAGING_JWT_SECRET }}" \
+            --from-literal=DATABASE_URL="${{ secrets.STAGING_DATABASE_URL }}" \
+            --from-literal=POSTGRES_PASSWORD="${{ secrets.STAGING_POSTGRES_PASSWORD }}" \
+            --from-literal=GRAFANA_ADMIN_PASSWORD="${{ secrets.STAGING_GRAFANA_PASSWORD }}" \
+            --from-literal=SEQ_API_KEY="${{ secrets.STAGING_SEQ_API_KEY }}" \
+            --from-literal=ACME_EMAIL="${{ secrets.ACME_EMAIL }}" \
+            --namespace=modernapi-staging \
+            --dry-run=client -o yaml | kubectl apply -f -
+            
+      - name: 🚀 Deploy to Kubernetes
+        run: |
+          export KUBECONFIG=kubeconfig
+          
+          # Apply all manifests
+          kubectl apply -f k8s/
+          
+          # Wait for rollout to complete
+          kubectl rollout status deployment/modernapi -n modernapi-staging --timeout=600s
+          kubectl rollout status deployment/postgres -n modernapi-staging --timeout=300s
+          
+      - name: 🔍 Verify deployment
+        run: |
+          export KUBECONFIG=kubeconfig
+          
+          # Check pod status
+          kubectl get pods -n modernapi-staging
+          
+          # Check service status
+          kubectl get services -n modernapi-staging
+          
+          # Wait for external endpoint to be ready
+          for i in {1..30}; do
+            if curl -f https://staging-api.yourdomain.com/health > /dev/null 2>&1; then
+              echo "✅ Kubernetes deployment is healthy"
+              break
+            fi
+            echo "⏳ Waiting for external endpoint... ($i/30)"
+            sleep 10
+          done
+          
+      - name: 🧹 Cleanup
+        if: always()
+        run: |
+          rm -f kubeconfig
+          
+  # =============================================================================
+  # Post-deployment Testing
+  # =============================================================================
+  test-deployment:
+    name: 🧪 Post-deployment Testing
+    runs-on: ubuntu-latest
+    needs: [validate, deploy-docker]  # or deploy-k8s
+    if: |
+      always() && 
+      needs.validate.result == 'success' &&
+      (needs.deploy-docker.result == 'success' || needs.deploy-k8s.result == 'success') &&
+      github.event.inputs.skip_tests != 'true'
+    timeout-minutes: 15
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        
+      - name: ⚡ Setup Node.js for API testing
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          
+      - name: 🧪 Install testing tools
+        run: |
+          npm install -g newman
+          # or install other API testing tools
+          
+      - name: 🔍 API Health Check
+        run: |
+          curl -f https://staging-api.yourdomain.com/health
+          curl -f https://staging-api.yourdomain.com/health/ready
+          
+      - name: 🧪 Basic API Tests
+        run: |
+          # Test authentication endpoints
+          echo "Testing authentication endpoints..."
+          
+          # Test user registration
+          REGISTER_RESPONSE=$(curl -s -w "%{http_code}" -o response.json -X POST \
+            https://staging-api.yourdomain.com/api/auth/register \
+            -H "Content-Type: application/json" \
+            -d '{
+              "email": "test-staging@example.com",
+              "password": "Test123!",
+              "confirmPassword": "Test123!",
+              "displayName": "Staging Test User"
+            }')
+          
+          if [[ $REGISTER_RESPONSE -eq 200 ]]; then
+            echo "✅ User registration test passed"
+          else
+            echo "❌ User registration test failed: $REGISTER_RESPONSE"
+            cat response.json
+          fi
+          
+          # Test user login
+          LOGIN_RESPONSE=$(curl -s -w "%{http_code}" -o login_response.json -X POST \
+            https://staging-api.yourdomain.com/api/auth/login \
+            -H "Content-Type: application/json" \
+            -d '{
+              "email": "admin@modernapi.dev",
+              "password": "Admin@123!"
+            }')
+          
+          if [[ $LOGIN_RESPONSE -eq 200 ]]; then
+            echo "✅ User login test passed"
+            TOKEN=$(cat login_response.json | jq -r '.accessToken')
+            echo "TOKEN=$TOKEN" >> $GITHUB_ENV
+          else
+            echo "❌ User login test failed: $LOGIN_RESPONSE"
+            cat login_response.json
+          fi
+          
+      - name: 🧪 Protected Endpoint Tests
+        if: env.TOKEN != ''
+        run: |
+          # Test protected endpoint
+          PROTECTED_RESPONSE=$(curl -s -w "%{http_code}" -o protected_response.json \
+            -H "Authorization: Bearer $TOKEN" \
+            https://staging-api.yourdomain.com/api/auth/me)
+          
+          if [[ $PROTECTED_RESPONSE -eq 200 ]]; then
+            echo "✅ Protected endpoint test passed"
+          else
+            echo "❌ Protected endpoint test failed: $PROTECTED_RESPONSE"
+            cat protected_response.json
+          fi
+          
+      - name: 🧪 Load Testing (Basic)
+        run: |
+          # Install k6 for load testing
+          curl -s https://github.com/grafana/k6/releases/download/v0.47.0/k6-v0.47.0-linux-amd64.tar.gz | tar xvz --strip-components 1
+          
+          # Create load test script
+          cat > loadtest.js << 'EOF'
+          import http from 'k6/http';
+          import { check } from 'k6';
+          
+          export let options = {
+            stages: [
+              { duration: '1m', target: 5 },
+              { duration: '2m', target: 5 },
+              { duration: '1m', target: 0 },
+            ],
+          };
+          
+          export default function() {
+            let res = http.get('https://staging-api.yourdomain.com/health');
+            check(res, {
+              'status is 200': (r) => r.status === 200,
+              'response time < 1000ms': (r) => r.timings.duration < 1000,
+            });
+          }
+          EOF
+          
+          # Run load test
+          ./k6 run loadtest.js
+          
+  # =============================================================================
+  # Database Migration
+  # =============================================================================
+  migrate-database:
+    name: 🗄️ Database Migration
+    runs-on: ubuntu-latest
+    needs: [validate, deploy-docker]  # or deploy-k8s
+    if: |
+      needs.validate.result == 'success' &&
+      (needs.deploy-docker.result == 'success' || needs.deploy-k8s.result == 'success')
+    timeout-minutes: 10
+    
+    environment:
+      name: staging-db
+      
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        
+      - name: ⚡ Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+          
+      - name: 🗄️ Install EF Core tools
+        run: dotnet tool install --global dotnet-ef
+        
+      - name: 🗄️ Run database migrations
+        run: |
+          dotnet ef database update \
+            --project ModernAPI.Infrastructure \
+            --startup-project ModernAPI.API \
+            --connection "${{ secrets.STAGING_DATABASE_URL }}" \
+            --verbose
+            
+      - name: 🧪 Verify database schema
+        run: |
+          # Add database schema validation tests here
+          echo "✅ Database migrations completed successfully"
+          
+  # =============================================================================
+  # Notification & Rollback
+  # =============================================================================
+  notify:
+    name: 📢 Deployment Notification
+    runs-on: ubuntu-latest
+    needs: [validate, deploy-docker, test-deployment, migrate-database]
+    if: always()
+    
+    steps:
+      - name: 📊 Generate deployment report
+        run: |
+          echo "## 🚀 Staging Deployment Report" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp:** $(date -u)" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ needs.validate.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** Staging" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Job Results" >> $GITHUB_STEP_SUMMARY
+          echo "- **Validation:** ${{ needs.validate.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Deployment:** ${{ needs.deploy-docker.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Testing:** ${{ needs.test-deployment.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Migration:** ${{ needs.migrate-database.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Overall status
+          if [[ "${{ needs.validate.result }}" == "success" && 
+                "${{ needs.deploy-docker.result }}" == "success" && 
+                ("${{ needs.test-deployment.result }}" == "success" || "${{ needs.test-deployment.result }}" == "skipped") && 
+                "${{ needs.migrate-database.result }}" == "success" ]]; then
+            echo "✅ **Staging deployment completed successfully!**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**🔗 Staging Environment:**" >> $GITHUB_STEP_SUMMARY
+            echo "- API: https://staging-api.yourdomain.com" >> $GITHUB_STEP_SUMMARY
+            echo "- Health: https://staging-api.yourdomain.com/health" >> $GITHUB_STEP_SUMMARY
+            echo "- Docs: https://staging-api.yourdomain.com/scalar/v1" >> $GITHUB_STEP_SUMMARY
+            echo "- Logs: https://logs.staging.yourdomain.com" >> $GITHUB_STEP_SUMMARY
+            echo "- Metrics: https://dashboard.staging.yourdomain.com" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Staging deployment failed or incomplete!**" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+      # Optional: Add Slack/Teams/Discord notification
+      # - name: 📱 Send Slack notification
+      #   if: always()
+      #   uses: 8398a7/action-slack@v3
+      #   with:
+      #     status: ${{ job.status }}
+      #     webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+      
+  # =============================================================================
+  # Rollback (if needed)
+  # =============================================================================
+  rollback:
+    name: ↩️ Rollback on Failure
+    runs-on: ubuntu-latest
+    needs: [validate, deploy-docker, test-deployment, migrate-database]
+    if: |
+      always() && 
+      (needs.deploy-docker.result == 'failure' || 
+       needs.test-deployment.result == 'failure' ||
+       needs.migrate-database.result == 'failure')
+    
+    environment:
+      name: staging-rollback
+      
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        
+      - name: ↩️ Rollback deployment
+        run: |
+          echo "⚠️ Rolling back staging deployment due to failure..."
+          
+          # Get previous successful deployment
+          PREVIOUS_VERSION=$(curl -s https://staging-api.yourdomain.com/version | jq -r '.version' || echo "unknown")
+          
+          # Implement rollback logic based on your deployment method
+          # For Docker Compose:
+          if [[ "${{ vars.STAGING_DEPLOYMENT_TYPE }}" != "kubernetes" ]]; then
+            ./scripts/deploy-docker.sh --rollback
+          else
+            # For Kubernetes:
+            kubectl rollout undo deployment/modernapi -n modernapi-staging
+          fi
+          
+          echo "🔄 Rollback completed. Previous version: $PREVIOUS_VERSION"

@@ -219,6 +219,9 @@ public class UserTests : DomainTestBase
         var user = CreateValidUser();
         user.IsActive.Should().BeTrue(); // Precondition
         var originalUpdatedAt = user.UpdatedAt;
+        
+        // Small delay to ensure different timestamp
+        Thread.Sleep(1);
 
         // Act
         user.Deactivate();

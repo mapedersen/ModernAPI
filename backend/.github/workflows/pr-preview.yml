@@ -1,0 +1,655 @@
+name: 🔍 PR Preview Environment
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [main, develop]
+  pull_request_review:
+    types: [submitted]
+  issue_comment:
+    types: [created, edited]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  PREVIEW_DOMAIN: preview.yourdomain.com
+
+# Concurrency: one preview per PR
+concurrency:
+  group: pr-preview-${{ github.event.number }}
+  cancel-in-progress: true
+
+jobs:
+  # =============================================================================
+  # Check if Preview Should Be Created
+  # =============================================================================
+  check-preview:
+    name: 🔍 Check Preview Requirements
+    runs-on: ubuntu-latest
+    if: |
+      github.event.pull_request.draft == false &&
+      (github.event_name == 'pull_request' || 
+       github.event_name == 'pull_request_review' ||
+       (github.event_name == 'issue_comment' && contains(github.event.comment.body, '/deploy-preview')))
+    timeout-minutes: 5
+    
+    outputs:
+      should_deploy: ${{ steps.decision.outputs.should_deploy }}
+      pr_number: ${{ steps.decision.outputs.pr_number }}
+      branch_name: ${{ steps.decision.outputs.branch_name }}
+      safe_branch_name: ${{ steps.decision.outputs.safe_branch_name }}
+      preview_url: ${{ steps.decision.outputs.preview_url }}
+      
+    steps:
+      - name: 📥 Checkout PR code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          
+      - name: 🔍 Determine deployment decision
+        id: decision
+        run: |
+          # Get PR number from different event types
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            PR_NUMBER="${{ github.event.number }}"
+            BRANCH_NAME="${{ github.event.pull_request.head.ref }}"
+          elif [[ "${{ github.event_name }}" == "pull_request_review" ]]; then
+            PR_NUMBER="${{ github.event.pull_request.number }}"
+            BRANCH_NAME="${{ github.event.pull_request.head.ref }}"
+          elif [[ "${{ github.event_name }}" == "issue_comment" ]]; then
+            PR_NUMBER="${{ github.event.issue.number }}"
+            # Get branch name from PR API
+            BRANCH_NAME=$(gh pr view $PR_NUMBER --json headRefName --jq '.headRefName')
+          fi
+          
+          # Create safe branch name for subdomain (lowercase, replace special chars)
+          SAFE_BRANCH_NAME=$(echo "$BRANCH_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-\|-$//g')
+          
+          # Determine if we should deploy
+          SHOULD_DEPLOY="false"
+          
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            # Deploy on PR open/sync/reopen
+            SHOULD_DEPLOY="true"
+          elif [[ "${{ github.event_name }}" == "pull_request_review" && "${{ github.event.review.state }}" == "approved" ]]; then
+            # Deploy on approval
+            SHOULD_DEPLOY="true"
+          elif [[ "${{ github.event_name }}" == "issue_comment" && "${{ contains(github.event.comment.body, '/deploy-preview') }}" ]]; then
+            # Deploy on manual command
+            SHOULD_DEPLOY="true"
+          fi
+          
+          # Set outputs
+          echo "should_deploy=$SHOULD_DEPLOY" >> $GITHUB_OUTPUT
+          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+          echo "safe_branch_name=$SAFE_BRANCH_NAME" >> $GITHUB_OUTPUT
+          echo "preview_url=https://pr-$PR_NUMBER.${{ env.PREVIEW_DOMAIN }}" >> $GITHUB_OUTPUT
+          
+          echo "🔍 Preview Decision:"
+          echo "  Should Deploy: $SHOULD_DEPLOY"
+          echo "  PR Number: $PR_NUMBER"
+          echo "  Branch: $BRANCH_NAME"
+          echo "  Safe Branch: $SAFE_BRANCH_NAME"
+          echo "  Preview URL: https://pr-$PR_NUMBER.${{ env.PREVIEW_DOMAIN }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+  # =============================================================================
+  # Build Preview Image
+  # =============================================================================
+  build-preview:
+    name: 🏗️ Build Preview Image
+    runs-on: ubuntu-latest
+    needs: [check-preview]
+    if: needs.check-preview.outputs.should_deploy == 'true'
+    timeout-minutes: 20
+    
+    outputs:
+      image_tag: ${{ steps.image.outputs.tag }}
+      
+    steps:
+      - name: 📥 Checkout PR code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          
+      - name: 🐳 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        
+      - name: 🔐 Login to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: 🏷️ Generate image tag
+        id: image
+        run: |
+          PR_NUMBER="${{ needs.check-preview.outputs.pr_number }}"
+          COMMIT_SHA="${{ github.event.pull_request.head.sha || github.sha }}"
+          SHORT_SHA=${COMMIT_SHA:0:7}
+          
+          IMAGE_TAG="pr-${PR_NUMBER}-${SHORT_SHA}"
+          echo "tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+          echo "📦 Preview image tag: $IMAGE_TAG"
+          
+      - name: 🏗️ Build and push preview image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.image.outputs.tag }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:pr-${{ needs.check-preview.outputs.pr_number }}
+          labels: |
+            org.opencontainers.image.title=ModernAPI Preview
+            org.opencontainers.image.description=Preview build for PR #${{ needs.check-preview.outputs.pr_number }}
+            org.opencontainers.image.version=${{ steps.image.outputs.tag }}
+            org.opencontainers.image.pr.number=${{ needs.check-preview.outputs.pr_number }}
+            org.opencontainers.image.pr.branch=${{ needs.check-preview.outputs.branch_name }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILD_VERSION=${{ steps.image.outputs.tag }}
+            BUILD_ENVIRONMENT=preview
+            BUILD_COMMIT=${{ github.event.pull_request.head.sha || github.sha }}
+            BUILD_PR=${{ needs.check-preview.outputs.pr_number }}
+            
+  # =============================================================================
+  # Deploy Preview Environment
+  # =============================================================================
+  deploy-preview:
+    name: 🚀 Deploy Preview
+    runs-on: ubuntu-latest
+    needs: [check-preview, build-preview]
+    if: needs.check-preview.outputs.should_deploy == 'true'
+    timeout-minutes: 15
+    
+    environment:
+      name: preview-pr-${{ needs.check-preview.outputs.pr_number }}
+      url: ${{ needs.check-preview.outputs.preview_url }}
+      
+    steps:
+      - name: 📥 Checkout PR code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          
+      - name: 🔧 Prepare preview environment
+        run: |
+          PR_NUMBER="${{ needs.check-preview.outputs.pr_number }}"
+          IMAGE_TAG="${{ needs.build-preview.outputs.image_tag }}"
+          
+          echo "🔧 Setting up preview environment for PR #$PR_NUMBER"
+          
+          # Create preview-specific environment file
+          cp .env.example .env.preview
+          
+          # Configure for preview environment
+          sed -i "s/DOMAIN=yourdomain.com/DOMAIN=${{ env.PREVIEW_DOMAIN }}/" .env.preview
+          sed -i "s/API_DOMAIN=api.yourdomain.com/API_DOMAIN=pr-$PR_NUMBER.${{ env.PREVIEW_DOMAIN }}/" .env.preview
+          sed -i "s/ASPNETCORE_ENVIRONMENT=Production/ASPNETCORE_ENVIRONMENT=Preview/" .env.preview
+          
+          # Set preview-specific secrets (less sensitive than production)
+          echo "JWT_SECRET=PreviewJWTSecretForPR${PR_NUMBER}Testing123456789!" >> .env.preview
+          echo "POSTGRES_PASSWORD=preview_password_$PR_NUMBER" >> .env.preview
+          echo "POSTGRES_DB=modernapi_pr_$PR_NUMBER" >> .env.preview
+          echo "POSTGRES_USER=modernapi_pr_$PR_NUMBER" >> .env.preview
+          echo "DATABASE_URL=Host=postgres;Database=modernapi_pr_${PR_NUMBER};Username=modernapi_pr_${PR_NUMBER};Password=preview_password_${PR_NUMBER}" >> .env.preview
+          
+          # Set monitoring credentials
+          echo "GRAFANA_ADMIN_PASSWORD=preview_grafana_$PR_NUMBER" >> .env.preview
+          echo "SEQ_API_KEY=preview_seq_key_$PR_NUMBER" >> .env.preview
+          echo "ACME_EMAIL=preview@${{ env.PREVIEW_DOMAIN }}" >> .env.preview
+          
+          # Set image version
+          echo "MODERNAPI_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$IMAGE_TAG" >> .env.preview
+          echo "PR_NUMBER=$PR_NUMBER" >> .env.preview
+          echo "PREVIEW_MODE=true" >> .env.preview
+          
+      - name: 🗄️ Setup preview database
+        run: |
+          PR_NUMBER="${{ needs.check-preview.outputs.pr_number }}"
+          
+          echo "🗄️ Setting up isolated database for PR #$PR_NUMBER"
+          
+          # Create docker-compose override for preview
+          cat > docker-compose.preview.yml << EOF
+          version: '3.8'
+          services:
+            postgres:
+              container_name: modernapi-postgres-pr-$PR_NUMBER
+              environment:
+                - POSTGRES_DB=modernapi_pr_$PR_NUMBER
+                - POSTGRES_USER=modernapi_pr_$PR_NUMBER
+                - POSTGRES_PASSWORD=preview_password_$PR_NUMBER
+              volumes:
+                - postgres-pr-$PR_NUMBER-data:/var/lib/postgresql/data
+              networks:
+                - modernapi-pr-$PR_NUMBER-network
+                
+            modernapi:
+              container_name: modernapi-app-pr-$PR_NUMBER
+              image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build-preview.outputs.image_tag }}
+              environment:
+                - ASPNETCORE_ENVIRONMENT=Preview
+                - DATABASE_URL=Host=postgres;Database=modernapi_pr_${PR_NUMBER};Username=modernapi_pr_${PR_NUMBER};Password=preview_password_${PR_NUMBER}
+                - JWT_SECRET=PreviewJWTSecretForPR${PR_NUMBER}Testing123456789!
+                - PREVIEW_MODE=true
+                - PR_NUMBER=$PR_NUMBER
+              labels:
+                - "traefik.http.routers.modernapi-pr-$PR_NUMBER.rule=Host(\`pr-$PR_NUMBER.${{ env.PREVIEW_DOMAIN }}\`)"
+                - "traefik.http.routers.modernapi-pr-$PR_NUMBER.tls=true"
+              networks:
+                - modernapi-pr-$PR_NUMBER-network
+                
+          volumes:
+            postgres-pr-$PR_NUMBER-data:
+              driver: local
+              
+          networks:
+            modernapi-pr-$PR_NUMBER-network:
+              driver: bridge
+              name: modernapi-pr-$PR_NUMBER-network
+          EOF
+          
+      - name: 🚀 Deploy preview environment
+        run: |
+          PR_NUMBER="${{ needs.check-preview.outputs.pr_number }}"
+          
+          echo "🚀 Deploying preview environment for PR #$PR_NUMBER"
+          
+          # Deploy using Docker Compose with preview configuration
+          docker-compose \
+            -f docker-compose.yml \
+            -f docker-compose.preview.yml \
+            --env-file .env.preview \
+            up -d
+            
+          echo "✅ Preview environment deployed"
+          
+      - name: ⏳ Wait for preview to be ready
+        run: |
+          PR_NUMBER="${{ needs.check-preview.outputs.pr_number }}"
+          PREVIEW_URL="https://pr-$PR_NUMBER.${{ env.PREVIEW_DOMAIN }}"
+          
+          echo "⏳ Waiting for preview environment to be ready..."
+          
+          # Wait for health endpoint with timeout
+          for i in {1..30}; do
+            if curl -f -k "$PREVIEW_URL/health" > /dev/null 2>&1; then
+              echo "✅ Preview environment is healthy: $PREVIEW_URL"
+              break
+            fi
+            echo "⏳ Waiting for preview... ($i/30)"
+            sleep 10
+          done
+          
+          # Test basic functionality
+          echo "🧪 Testing preview environment..."
+          curl -f -k "$PREVIEW_URL/health" || exit 1
+          
+      - name: 🗄️ Run database migrations
+        run: |
+          PR_NUMBER="${{ needs.check-preview.outputs.pr_number }}"
+          
+          echo "🗄️ Running database migrations for preview..."
+          
+          # Run migrations in preview container
+          docker exec "modernapi-app-pr-$PR_NUMBER" dotnet ef database update \
+            --connection "Host=postgres;Database=modernapi_pr_${PR_NUMBER};Username=modernapi_pr_${PR_NUMBER};Password=preview_password_${PR_NUMBER}" || true
+            
+          echo "✅ Database migrations completed"
+          
+  # =============================================================================
+  # Test Preview Environment
+  # =============================================================================
+  test-preview:
+    name: 🧪 Test Preview
+    runs-on: ubuntu-latest
+    needs: [check-preview, build-preview, deploy-preview]
+    if: needs.check-preview.outputs.should_deploy == 'true'
+    timeout-minutes: 10
+    
+    steps:
+      - name: 📥 Checkout PR code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          
+      - name: 🧪 Run preview tests
+        run: |
+          PR_NUMBER="${{ needs.check-preview.outputs.pr_number }}"
+          PREVIEW_URL="https://pr-$PR_NUMBER.${{ env.PREVIEW_DOMAIN }}"
+          
+          echo "🧪 Running comprehensive tests against preview environment..."
+          
+          # Health checks
+          echo "🔍 Testing health endpoints..."
+          curl -f -k "$PREVIEW_URL/health"
+          curl -f -k "$PREVIEW_URL/health/ready"
+          
+          # API functionality tests
+          echo "🧪 Testing API functionality..."
+          
+          # Test user registration
+          REGISTER_RESPONSE=$(curl -s -w "%{http_code}" -k -o register_response.json -X POST \
+            "$PREVIEW_URL/api/auth/register" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "email": "preview-test@example.com",
+              "password": "Preview123!",
+              "confirmPassword": "Preview123!",
+              "displayName": "Preview Test User"
+            }')
+          
+          if [[ $REGISTER_RESPONSE -eq 200 ]]; then
+            echo "✅ User registration test passed"
+          else
+            echo "⚠️ User registration test failed: $REGISTER_RESPONSE"
+            cat register_response.json
+          fi
+          
+          # Test admin login
+          LOGIN_RESPONSE=$(curl -s -w "%{http_code}" -k -o login_response.json -X POST \
+            "$PREVIEW_URL/api/auth/login" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "email": "admin@modernapi.dev",
+              "password": "Admin@123!"
+            }')
+          
+          if [[ $LOGIN_RESPONSE -eq 200 ]]; then
+            echo "✅ Admin login test passed"
+            TOKEN=$(cat login_response.json | jq -r '.accessToken' 2>/dev/null || echo "")
+            
+            if [[ -n "$TOKEN" && "$TOKEN" != "null" ]]; then
+              # Test protected endpoint
+              PROTECTED_RESPONSE=$(curl -s -w "%{http_code}" -k -o protected_response.json \
+                -H "Authorization: Bearer $TOKEN" \
+                "$PREVIEW_URL/api/auth/me")
+                
+              if [[ $PROTECTED_RESPONSE -eq 200 ]]; then
+                echo "✅ Protected endpoint test passed"
+              else
+                echo "⚠️ Protected endpoint test failed: $PROTECTED_RESPONSE"
+              fi
+            fi
+          else
+            echo "⚠️ Admin login test failed: $LOGIN_RESPONSE"
+            cat login_response.json
+          fi
+          
+          # Performance test
+          echo "⚡ Testing response time..."
+          RESPONSE_TIME=$(curl -w "%{time_total}" -k -o /dev/null -s "$PREVIEW_URL/health")
+          echo "📊 Response time: ${RESPONSE_TIME}s"
+          
+          echo "✅ Preview testing completed"
+          
+  # =============================================================================
+  # Update PR with Preview Info
+  # =============================================================================
+  comment-preview:
+    name: 💬 Update PR Comment
+    runs-on: ubuntu-latest
+    needs: [check-preview, build-preview, deploy-preview, test-preview]
+    if: |
+      always() &&
+      needs.check-preview.outputs.should_deploy == 'true' &&
+      github.event_name == 'pull_request'
+    
+    steps:
+      - name: 💬 Create or update PR comment
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = ${{ needs.check-preview.outputs.pr_number }};
+            const previewUrl = '${{ needs.check-preview.outputs.preview_url }}';
+            const imageTag = '${{ needs.build-preview.outputs.image_tag }}';
+            const deployResult = '${{ needs.deploy-preview.result }}';
+            const testResult = '${{ needs.test-preview.result }}';
+            
+            let status = '🚀';
+            let statusText = 'Deployed successfully';
+            
+            if (deployResult !== 'success') {
+              status = '❌';
+              statusText = 'Deployment failed';
+            } else if (testResult !== 'success') {
+              status = '⚠️';
+              statusText = 'Deployed with test failures';
+            }
+            
+            const commentBody = `
+            ## ${status} Preview Environment
+            
+            **Status:** ${statusText}
+            
+            ### 🔗 Preview Links
+            - **API:** [${previewUrl}](${previewUrl})
+            - **Health:** [${previewUrl}/health](${previewUrl}/health)
+            - **API Docs:** [${previewUrl}/scalar/v1](${previewUrl}/scalar/v1)
+            - **Docker Image:** \`ghcr.io/${{ github.repository }}:${imageTag}\`
+            
+            ### 📊 Test Results
+            - **Deployment:** ${deployResult === 'success' ? '✅ Passed' : '❌ Failed'}
+            - **API Tests:** ${testResult === 'success' ? '✅ Passed' : testResult === 'failure' ? '❌ Failed' : '⏭️ Skipped'}
+            - **Health Checks:** ${deployResult === 'success' ? '✅ Healthy' : '❌ Unhealthy'}
+            
+            ### 🛠️ Developer Info
+            - **Branch:** \`${{ needs.check-preview.outputs.branch_name }}\`
+            - **Commit:** \`${{ github.event.pull_request.head.sha }}\`
+            - **Image Tag:** \`${imageTag}\`
+            
+            ### 🧪 Testing Instructions
+            \`\`\`bash
+            # Test the preview API
+            curl -f ${previewUrl}/health
+            
+            # Test authentication
+            curl -X POST ${previewUrl}/api/auth/login \\
+              -H "Content-Type: application/json" \\
+              -d '{"email": "admin@modernapi.dev", "password": "Admin@123!"}'
+            \`\`\`
+            
+            ### 🔧 Commands
+            - Comment \`/deploy-preview\` to redeploy
+            - Comment \`/destroy-preview\` to destroy this environment
+            
+            <sub>🤖 This preview environment will be automatically destroyed when the PR is closed or after 7 days of inactivity.</sub>
+            `;
+            
+            // Find existing preview comment
+            const comments = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+            });
+            
+            const existingComment = comments.data.find(comment => 
+              comment.user.login === 'github-actions[bot]' && 
+              comment.body.includes('Preview Environment')
+            );
+            
+            if (existingComment) {
+              // Update existing comment
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existingComment.id,
+                body: commentBody
+              });
+            } else {
+              // Create new comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: commentBody
+              });
+            }
+            
+  # =============================================================================
+  # Cleanup on PR Close
+  # =============================================================================
+  cleanup-on-close:
+    name: 🧹 Cleanup Preview on PR Close
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'pull_request' &&
+      github.event.action == 'closed'
+    timeout-minutes: 10
+    
+    steps:
+      - name: 🧹 Destroy preview environment
+        run: |
+          PR_NUMBER="${{ github.event.number }}"
+          
+          echo "🧹 Cleaning up preview environment for closed PR #$PR_NUMBER"
+          
+          # Stop and remove containers
+          docker-compose \
+            -f docker-compose.yml \
+            -f docker-compose.preview.yml \
+            --env-file .env.preview \
+            down -v --remove-orphans || true
+            
+          # Remove preview-specific volumes
+          docker volume rm "modernapi_postgres-pr-${PR_NUMBER}-data" || true
+          
+          # Remove preview network
+          docker network rm "modernapi-pr-${PR_NUMBER}-network" || true
+          
+          echo "✅ Preview environment cleanup completed"
+          
+      - name: 🗑️ Delete preview images
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = ${{ github.event.number }};
+            const packageName = '${{ env.IMAGE_NAME }}';
+            
+            try {
+              // Get all package versions
+              const packages = await github.rest.packages.getAllPackageVersionsForPackageOwnedByOrg({
+                package_type: 'container',
+                package_name: packageName.split('/')[1],
+                org: context.repo.owner,
+                per_page: 100
+              });
+              
+              // Find and delete PR-specific images
+              const prImages = packages.data.filter(pkg => 
+                pkg.metadata?.container?.tags?.some(tag => 
+                  tag.includes(`pr-${prNumber}`)
+                )
+              );
+              
+              for (const image of prImages) {
+                console.log(`🗑️ Deleting preview image: ${image.name}`);
+                await github.rest.packages.deletePackageVersionForOrg({
+                  package_type: 'container',
+                  package_name: packageName.split('/')[1],
+                  org: context.repo.owner,
+                  package_version_id: image.id
+                });
+              }
+              
+              console.log(`✅ Deleted ${prImages.length} preview images for PR #${prNumber}`);
+            } catch (error) {
+              console.log(`ℹ️ Image cleanup failed or not needed: ${error.message}`);
+            }
+            
+      - name: 💬 Update PR with cleanup status
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ github.event.number }},
+              body: `## 🧹 Preview Environment Cleaned Up
+              
+              The preview environment for this PR has been automatically destroyed:
+              - ✅ Containers stopped and removed
+              - ✅ Volumes deleted
+              - ✅ Docker images cleaned up
+              - ✅ Network resources freed
+              
+              Thank you for using the preview environment! 🚀`
+            });
+            
+  # =============================================================================
+  # Scheduled Cleanup of Old Previews
+  # =============================================================================
+  scheduled-cleanup:
+    name: 🧹 Scheduled Preview Cleanup
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    timeout-minutes: 15
+    
+    steps:
+      - name: 🧹 Clean up stale preview environments
+        run: |
+          echo "🧹 Cleaning up stale preview environments..."
+          
+          # Find containers older than 7 days with preview labels
+          OLD_CONTAINERS=$(docker ps -a --filter "label=org.opencontainers.image.pr.number" --format "table {{.Names}}\t{{.CreatedAt}}" | \
+            awk 'NR>1 && $2 ~ /[0-9]+ (day|week)s? ago/ && $2 !~ /^[0-6] day/' | cut -f1)
+          
+          if [[ -n "$OLD_CONTAINERS" ]]; then
+            echo "🗑️ Removing stale preview containers:"
+            echo "$OLD_CONTAINERS"
+            
+            echo "$OLD_CONTAINERS" | xargs -r docker rm -f
+            
+            # Clean up associated volumes
+            docker volume prune -f --filter "label=preview=true"
+          else
+            echo "ℹ️ No stale preview containers found"
+          fi
+          
+      - name: 🗑️ Clean up old preview images
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const packageName = '${{ env.IMAGE_NAME }}';
+            const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+            
+            try {
+              const packages = await github.rest.packages.getAllPackageVersionsForPackageOwnedByOrg({
+                package_type: 'container',
+                package_name: packageName.split('/')[1],
+                org: context.repo.owner,
+                per_page: 100
+              });
+              
+              // Find old preview images
+              const oldPreviewImages = packages.data.filter(pkg => 
+                pkg.metadata?.container?.tags?.some(tag => tag.includes('pr-')) &&
+                new Date(pkg.created_at) < sevenDaysAgo
+              );
+              
+              for (const image of oldPreviewImages) {
+                console.log(`🗑️ Deleting old preview image: ${image.name} (${image.created_at})`);
+                await github.rest.packages.deletePackageVersionForOrg({
+                  package_type: 'container',
+                  package_name: packageName.split('/')[1],
+                  org: context.repo.owner,
+                  package_version_id: image.id
+                });
+              }
+              
+              console.log(`✅ Cleaned up ${oldPreviewImages.length} old preview images`);
+            } catch (error) {
+              console.log(`ℹ️ Scheduled cleanup failed: ${error.message}`);
+            }

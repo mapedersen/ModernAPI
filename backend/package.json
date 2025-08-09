@@ -1,0 +1,74 @@
+{
+  "name": "modernapi-backend",
+  "version": "1.0.0",
+  "description": "A modern .NET 9 Web API template implementing Clean Architecture with comprehensive CI/CD",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/modernapi.git"
+  },
+  "homepage": "https://github.com/your-org/modernapi#readme",
+  "bugs": {
+    "url": "https://github.com/your-org/modernapi/issues"
+  },
+  "keywords": [
+    "dotnet",
+    "webapi",
+    "clean-architecture",
+    "jwt-authentication",
+    "postgresql",
+    "docker",
+    "kubernetes",
+    "ci-cd"
+  ],
+  "license": "MIT",
+  "scripts": {
+    "commit": "git-cz",
+    "lint:commits": "commitlint --from=HEAD~1",
+    "release": "semantic-release",
+    "release:dry-run": "semantic-release --dry-run",
+    "changelog": "conventional-changelog -p angular -i CHANGELOG.md -s",
+    "version": "conventional-changelog -p angular -i CHANGELOG.md -s && git add CHANGELOG.md",
+    "prepare": "husky install",
+    "pre-commit": "lint-staged",
+    "setup:hooks": "git config commit.template .gitmessage"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^18.4.3",
+    "@commitlint/config-conventional": "^18.4.3",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/commit-analyzer": "^11.1.0",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/github": "^9.2.5",
+    "@semantic-release/npm": "^11.0.2",
+    "@semantic-release/release-notes-generator": "^12.1.0",
+    "commitizen": "^4.3.0",
+    "conventional-changelog-cli": "^4.1.0",
+    "cz-conventional-changelog": "^3.3.0",
+    "husky": "^8.0.3",
+    "lint-staged": "^15.2.0",
+    "semantic-release": "^22.0.12"
+  },
+  "config": {
+    "commitizen": {
+      "path": "./node_modules/cz-conventional-changelog"
+    }
+  },
+  "lint-staged": {
+    "*.{cs,csproj,sln}": [
+      "dotnet format --include"
+    ],
+    "*.{json,yml,yaml,md}": [
+      "prettier --write"
+    ]
+  },
+  "husky": {
+    "hooks": {
+      "commit-msg": "commitlint -E HUSKY_GIT_PARAMS",
+      "pre-commit": "lint-staged"
+    }
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  }
+}

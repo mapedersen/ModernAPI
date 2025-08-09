@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.JsonPatch;
 using ModernAPI.Application.DTOs;
 using ModernAPI.Application.Common.Exceptions;
 
@@ -65,6 +66,18 @@ public interface IUserService
     /// <exception cref="NotFoundException">Thrown when the user is not found</exception>
     /// <exception cref="ValidationException">Thrown when the request is invalid</exception>
     Task<UserResponse> UpdateUserProfileAsync(Guid userId, UpdateUserProfileRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Partially updates a user's profile information using JSON Patch operations.
+    /// Supports RFC 6902 JSON Patch standard for granular updates.
+    /// </summary>
+    /// <param name="userId">The unique identifier of the user to update</param>
+    /// <param name="patchDocument">The JSON Patch document containing operations to apply</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The updated user as a UserResponse</returns>
+    /// <exception cref="NotFoundException">Thrown when the user is not found</exception>
+    /// <exception cref="ValidationException">Thrown when the patch operations are invalid</exception>
+    Task<UserResponse> PatchUserProfileAsync(Guid userId, JsonPatchDocument<PatchUserProfileRequest> patchDocument, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Changes a user's email address.

@@ -113,13 +113,12 @@ public abstract class IntegrationTestBase : IAsyncDisposable, IDisposable
     /// <returns>A valid CreateUserRequest DTO</returns>
     protected CreateUserRequest CreateValidCreateUserRequest()
     {
-        return new CreateUserRequest
-        {
-            Email = Faker.Internet.Email(),
-            DisplayName = Faker.Name.FullName(),
-            FirstName = Faker.Name.FirstName(),
-            LastName = Faker.Name.LastName()
-        };
+        return new CreateUserRequest(
+            Faker.Internet.Email(),
+            Faker.Name.FullName(),
+            Faker.Name.FirstName(),
+            Faker.Name.LastName()
+        );
     }
 
     /// <summary>
@@ -128,12 +127,11 @@ public abstract class IntegrationTestBase : IAsyncDisposable, IDisposable
     /// <returns>A valid UpdateUserProfileRequest DTO</returns>
     protected UpdateUserProfileRequest CreateValidUpdateUserProfileRequest()
     {
-        return new UpdateUserProfileRequest
-        {
-            DisplayName = Faker.Name.FullName(),
-            FirstName = Faker.Name.FirstName(),
-            LastName = Faker.Name.LastName()
-        };
+        return new UpdateUserProfileRequest(
+            Faker.Name.FullName(),
+            Faker.Name.FirstName(),
+            Faker.Name.LastName()
+        );
     }
 
     /// <summary>

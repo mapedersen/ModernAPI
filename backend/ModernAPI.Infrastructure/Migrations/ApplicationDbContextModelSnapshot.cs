@@ -184,6 +184,69 @@ namespace ModernAPI.Infrastructure.Migrations
                     b.ToTable("asp_net_user_tokens", (string)null);
                 });
 
+            modelBuilder.Entity("ModernAPI.Domain.Entities.RefreshToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<bool>("IsRevoked")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_revoked");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<string>("RevokedReason")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("revoked_reason");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("token");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("p_k_refresh_tokens");
+
+                    b.HasIndex("ExpiresAt")
+                        .HasDatabaseName("ix_refresh_tokens_expires_at");
+
+                    b.HasIndex("Token")
+                        .IsUnique()
+                        .HasDatabaseName("ix_refresh_tokens_token");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_refresh_tokens_user_id");
+
+                    b.HasIndex("UserId", "IsRevoked", "ExpiresAt")
+                        .HasDatabaseName("ix_refresh_tokens_user_active");
+
+                    b.ToTable("refresh_tokens", (string)null);
+                });
+
             modelBuilder.Entity("ModernAPI.Domain.Entities.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -372,6 +435,18 @@ namespace ModernAPI.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("f_k_asp_net_user_tokens_users_user_id");
+                });
+
+            modelBuilder.Entity("ModernAPI.Domain.Entities.RefreshToken", b =>
+                {
+                    b.HasOne("ModernAPI.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_refresh_tokens_users_user_id");
+
+                    b.Navigation("User");
                 });
 #pragma warning restore 612, 618
         }

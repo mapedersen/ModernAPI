@@ -1,0 +1,50 @@
+using {{Namespace}}.Domain.Entities;
+
+namespace {{Namespace}}.Domain.Entities;
+
+/// <summary>
+/// {{Name}} entity - Generated on {{GeneratedAt}}
+/// </summary>
+public class {{Name}} : Entity<Guid>
+{
+    protected {{Name}}() { } // EF Core constructor
+
+    public {{Name}}({{#each Properties}}{{#unless @last}}{{Type}} {{camelCase Name}}, {{/unless}}{{#if @last}}{{Type}} {{camelCase Name}}{{/if}}{{/each}})
+    {
+        Id = Guid.NewGuid();
+        {{#each Properties}}
+        {{Name}} = {{camelCase Name}};
+        {{/each}}
+        CreatedAt = DateTime.UtcNow;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    {{#each Properties}}
+    public {{Type}} {{Name}} { get; private set; }{{#if DefaultValue}} = {{DefaultValue}};{{/if}}
+    {{/each}}
+
+    public DateTime CreatedAt { get; private set; }
+    public DateTime UpdatedAt { get; private set; }
+
+    // Business methods
+    public void Update({{#each Properties}}{{#unless @last}}{{Type}} {{camelCase Name}}, {{/unless}}{{#if @last}}{{Type}} {{camelCase Name}}{{/if}}{{/each}})
+    {
+        {{#each Properties}}
+        {{Name}} = {{camelCase Name}};
+        {{/each}}
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public static {{Name}} Create({{#each Properties}}{{#unless @last}}{{Type}} {{camelCase Name}}, {{/unless}}{{#if @last}}{{Type}} {{camelCase Name}}{{/if}}{{/each}})
+    {
+        // Add business validation here
+        {{#each Properties}}
+        {{#if IsRequired}}
+        if ({{#if IsNullable}}string.IsNullOrWhiteSpace({{camelCase Name}}){{else}}{{camelCase Name}} == default{{/if}})
+            throw new ArgumentException("{{Name}} is required", nameof({{camelCase Name}}));
+        {{/if}}
+        {{/each}}
+
+        return new {{Name}}({{#each Properties}}{{#unless @last}}{{camelCase Name}}, {{/unless}}{{#if @last}}{{camelCase Name}}{{/if}}{{/each}});
+    }
+}

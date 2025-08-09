@@ -3,6 +3,7 @@ using Xunit;
 using ModernAPI.Infrastructure.Repositories;
 using ModernAPI.Infrastructure.Tests.Common;
 using ModernAPI.Domain.ValueObjects;
+using ModernAPI.Domain.Entities;
 
 namespace ModernAPI.Infrastructure.Tests.Repositories;
 
@@ -74,7 +75,7 @@ public class UserRepositoryTests : InfrastructureTestBase
         var user = await AddUserToDatabase(CreateValidUser());
 
         // Act
-        var result = await _userRepository.ExistsByEmailAsync(user.GetDomainEmail());
+        var result = await _userRepository.ExistsByEmailAsync(new Email(user.Email!));
 
         // Assert
         result.Should().BeTrue();
@@ -133,7 +134,7 @@ public class UserRepositoryTests : InfrastructureTestBase
         var searchTerm = "John";
         var matchingUser = CreateValidUser();
         // Use reflection or create a method to set display name to contain search term
-        var users = new List<User> { matchingUser, CreateValidUser(), CreateValidUser() };
+        var users = new List<ModernAPI.Domain.Entities.User> { matchingUser, CreateValidUser(), CreateValidUser() };
         
         // Note: This test assumes we have a way to set specific display names for testing
         await AddUsersToDatabase(users);
@@ -176,7 +177,7 @@ public class UserRepositoryTests : InfrastructureTestBase
         var user = await AddUserToDatabase(CreateValidUser());
 
         // Act
-        await _userRepository.DeleteAsync(user);
+        await _userRepository.RemoveAsync(user);
         await DbContext.SaveChangesAsync();
 
         // Assert

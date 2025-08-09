@@ -1,0 +1,103 @@
+version: '3.8'
+
+services:
+  # Seq - Log aggregation and analysis
+  seq:
+    image: datalust/seq:latest
+    container_name: modernapi-seq
+    environment:
+      - ACCEPT_EULA=Y
+    ports:
+      - "5341:5341"  # Ingestion API
+      - "8080:80"    # Web UI
+    volumes:
+      - seq-data:/data
+    networks:
+      - modernapi-network
+    restart: unless-stopped
+
+  # Prometheus - Metrics storage
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: modernapi-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '--storage.tsdb.retention.time=30d'
+    networks:
+      - modernapi-network
+    restart: unless-stopped
+
+  # Grafana - Visualization and dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: modernapi-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ALLOW_EMBEDDING=true
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      - modernapi-network
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+      - seq
+
+  # OpenTelemetry Collector (Optional - for advanced scenarios)
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: modernapi-otel
+    command: ["--config=/etc/otel-collector-config.yml"]
+    volumes:
+      - ./monitoring/otel/otel-collector-config.yml:/etc/otel-collector-config.yml:ro
+    ports:
+      - "4317:4317"   # OTLP gRPC receiver
+      - "4318:4318"   # OTLP HTTP receiver
+      - "8888:8888"   # Prometheus metrics exposed by the collector
+      - "8889:8889"   # Prometheus exporter metrics
+      - "13133:13133" # Health check
+    networks:
+      - modernapi-network
+    restart: unless-stopped
+
+  # Jaeger - Distributed tracing (Optional)
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: modernapi-jaeger
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      - "16686:16686" # Web UI
+      - "14268:14268" # Collector HTTP
+      - "14250:14250" # Collector gRPC
+    networks:
+      - modernapi-network
+    restart: unless-stopped
+
+volumes:
+  seq-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+
+networks:
+  modernapi-network:
+    external: true
+    name: modernapi_default

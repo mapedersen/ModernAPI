@@ -17,7 +17,6 @@ namespace ModernAPI.API.Tests.Common;
 public abstract class ApiTestBase : IDisposable
 {
     protected readonly Mock<IUserService> MockUserService;
-    protected readonly Mock<ILogger<T>> MockLogger<T>();
     protected readonly Faker Faker = new();
 
     protected ApiTestBase()
@@ -30,7 +29,7 @@ public abstract class ApiTestBase : IDisposable
     /// </summary>
     /// <typeparam name="T">The type to create a logger for</typeparam>
     /// <returns>Mock logger instance</returns>
-    protected Mock<ILogger<T>> MockLogger<T>()
+    protected Mock<ILogger<T>> CreateMockLogger<T>()
     {
         return new Mock<ILogger<T>>();
     }
@@ -83,13 +82,12 @@ public abstract class ApiTestBase : IDisposable
     /// <returns>A valid CreateUserRequest DTO</returns>
     protected CreateUserRequest CreateValidCreateUserRequest()
     {
-        return new CreateUserRequest
-        {
-            Email = Faker.Internet.Email(),
-            DisplayName = Faker.Name.FullName(),
-            FirstName = Faker.Name.FirstName(),
-            LastName = Faker.Name.LastName()
-        };
+        return new CreateUserRequest(
+            Faker.Internet.Email(),
+            Faker.Name.FullName(),
+            Faker.Name.FirstName(),
+            Faker.Name.LastName()
+        );
     }
 
     /// <summary>
@@ -98,12 +96,11 @@ public abstract class ApiTestBase : IDisposable
     /// <returns>A valid UpdateUserProfileRequest DTO</returns>
     protected UpdateUserProfileRequest CreateValidUpdateUserProfileRequest()
     {
-        return new UpdateUserProfileRequest
-        {
-            DisplayName = Faker.Name.FullName(),
-            FirstName = Faker.Name.FirstName(),
-            LastName = Faker.Name.LastName()
-        };
+        return new UpdateUserProfileRequest(
+            Faker.Name.FullName(),
+            Faker.Name.FirstName(),
+            Faker.Name.LastName()
+        );
     }
 
     /// <summary>
@@ -112,10 +109,9 @@ public abstract class ApiTestBase : IDisposable
     /// <returns>A valid ChangeUserEmailRequest DTO</returns>
     protected ChangeUserEmailRequest CreateValidChangeUserEmailRequest()
     {
-        return new ChangeUserEmailRequest
-        {
-            NewEmail = Faker.Internet.Email()
-        };
+        return new ChangeUserEmailRequest(
+            Faker.Internet.Email()
+        );
     }
 
     /// <summary>
@@ -124,18 +120,17 @@ public abstract class ApiTestBase : IDisposable
     /// <returns>A valid UserDto for testing</returns>
     protected UserDto CreateValidUserDto()
     {
-        return new UserDto
-        {
-            Id = Guid.NewGuid(),
-            Email = Faker.Internet.Email(),
-            DisplayName = Faker.Name.FullName(),
-            FirstName = Faker.Name.FirstName(),
-            LastName = Faker.Name.LastName(),
-            IsActive = true,
-            IsEmailVerified = false,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
-        };
+        return new UserDto(
+            Guid.NewGuid(),
+            Faker.Internet.Email(),
+            Faker.Name.FullName(),
+            Faker.Name.FirstName(),
+            Faker.Name.LastName(),
+            true,
+            false,
+            DateTime.UtcNow,
+            DateTime.UtcNow
+        );
     }
 
     /// <summary>
@@ -144,11 +139,10 @@ public abstract class ApiTestBase : IDisposable
     /// <returns>A valid UserResponse for testing</returns>
     protected UserResponse CreateValidUserResponse()
     {
-        return new UserResponse
-        {
-            User = CreateValidUserDto(),
-            Message = "Operation completed successfully"
-        };
+        return new UserResponse(
+            CreateValidUserDto(),
+            "Operation completed successfully"
+        );
     }
 
     /// <summary>
@@ -158,14 +152,8 @@ public abstract class ApiTestBase : IDisposable
     /// <returns>A valid UserListDto for testing</returns>
     protected UserListDto CreateValidUserListDto(int userCount = 3)
     {
-        return new UserListDto
-        {
-            Users = Enumerable.Range(0, userCount).Select(_ => CreateValidUserDto()).ToList(),
-            TotalCount = userCount,
-            Page = 1,
-            PageSize = 20,
-            TotalPages = 1
-        };
+        var users = Enumerable.Range(0, userCount).Select(_ => CreateValidUserDto()).ToList().AsReadOnly();
+        return UserListDto.Create(users, userCount, 1, 20);
     }
 
     /// <summary>

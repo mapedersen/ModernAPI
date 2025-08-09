@@ -1,0 +1,60 @@
+# Prometheus configuration for ModernAPI production monitoring
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    environment: 'production'
+    cluster: 'modernapi'
+
+# Rules files
+rule_files:
+  - "/etc/prometheus/alerts/*.yml"
+
+# Alert manager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+# Scrape configurations
+scrape_configs:
+  # ModernAPI Application
+  - job_name: 'modernapi'
+    static_configs:
+      - targets: ['modernapi:8080']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+    scrape_timeout: 10s
+
+  # PostgreSQL Database (if using postgres_exporter)
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+    scrape_interval: 30s
+
+  # Traefik Reverse Proxy
+  - job_name: 'traefik'
+    static_configs:
+      - targets: ['traefik:8080']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  # OpenTelemetry Collector
+  - job_name: 'otel-collector'
+    static_configs:
+      - targets: ['otel-collector:8888']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    scrape_interval: 30s
+
+  # Node Exporter (if deployed)
+  - job_name: 'node'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 30s

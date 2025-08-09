@@ -1,0 +1,133 @@
+using Microsoft.AspNetCore.Mvc;
+{{#if RequiresAuth}}
+using Microsoft.AspNetCore.Authorization;
+{{/if}}
+using {{Namespace}}.Application.DTOs;
+using {{Namespace}}.Application.Interfaces;
+
+namespace {{Namespace}}.API.Controllers;
+
+/// <summary>
+/// {{NamePlural}} controller - Generated on {{GeneratedAt}}
+/// </summary>
+[ApiController]
+[Route("api/[controller]")]
+{{#if RequiresAuth}}
+[Authorize]
+{{/if}}
+public class {{NamePlural}}Controller : ControllerBase
+{
+    private readonly I{{Name}}Service _{{camelCase Name}}Service;
+    private readonly ILogger<{{NamePlural}}Controller> _logger;
+
+    public {{NamePlural}}Controller(
+        I{{Name}}Service {{camelCase Name}}Service,
+        ILogger<{{NamePlural}}Controller> logger)
+    {
+        _{{camelCase Name}}Service = {{camelCase Name}}Service;
+        _logger = logger;
+    }
+
+    /// <summary>
+    /// Get all {{NamePlural}}
+    /// </summary>
+    [HttpGet]
+    public async Task<ActionResult<IReadOnlyList<{{Name}}Dto>>> GetAll(CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Getting all {{NamePlural}}");
+        var {{camelCase NamePlural}} = await _{{camelCase Name}}Service.GetAllAsync(cancellationToken);
+        return Ok({{camelCase NamePlural}});
+    }
+
+    /// <summary>
+    /// Get paged {{NamePlural}}
+    /// </summary>
+    [HttpGet("paged")]
+    public async Task<ActionResult<IReadOnlyList<{{Name}}Dto>>> GetPaged(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Getting paged {{NamePlural}} - Page: {Page}, PageSize: {PageSize}", page, pageSize);
+        var {{camelCase NamePlural}} = await _{{camelCase Name}}Service.GetPagedAsync(page, pageSize, cancellationToken);
+        return Ok({{camelCase NamePlural}});
+    }
+
+    /// <summary>
+    /// Get {{Name}} by ID
+    /// </summary>
+    [HttpGet("{id:guid}")]
+    public async Task<ActionResult<{{Name}}Dto>> GetById(Guid id, CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Getting {{Name}} with ID: {Id}", id);
+        var {{camelCase Name}} = await _{{camelCase Name}}Service.GetByIdAsync(id, cancellationToken);
+        
+        if ({{camelCase Name}} == null)
+        {
+            return NotFound($"{{Name}} with ID {id} not found");
+        }
+
+        return Ok({{camelCase Name}});
+    }
+
+    /// <summary>
+    /// Create new {{Name}}
+    /// </summary>
+    [HttpPost]
+    public async Task<ActionResult<{{Name}}Dto>> Create(
+        [FromBody] Create{{Name}}Request request,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Creating new {{Name}}");
+        var {{camelCase Name}} = await _{{camelCase Name}}Service.CreateAsync(request, cancellationToken);
+        return CreatedAtAction(nameof(GetById), new { id = {{camelCase Name}}.Id }, {{camelCase Name}});
+    }
+
+    /// <summary>
+    /// Update existing {{Name}}
+    /// </summary>
+    [HttpPut("{id:guid}")]
+    public async Task<ActionResult<{{Name}}Dto>> Update(
+        Guid id,
+        [FromBody] Update{{Name}}Request request,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Updating {{Name}} with ID: {Id}", id);
+        var {{camelCase Name}} = await _{{camelCase Name}}Service.UpdateAsync(id, request, cancellationToken);
+        
+        if ({{camelCase Name}} == null)
+        {
+            return NotFound($"{{Name}} with ID {id} not found");
+        }
+
+        return Ok({{camelCase Name}});
+    }
+
+    /// <summary>
+    /// Delete {{Name}}
+    /// </summary>
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Deleting {{Name}} with ID: {Id}", id);
+        var success = await _{{camelCase Name}}Service.DeleteAsync(id, cancellationToken);
+        
+        if (!success)
+        {
+            return NotFound($"{{Name}} with ID {id} not found");
+        }
+
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Get {{Name}} count
+    /// </summary>
+    [HttpGet("count")]
+    public async Task<ActionResult<int>> GetCount(CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Getting {{Name}} count");
+        var count = await _{{camelCase Name}}Service.GetCountAsync(cancellationToken);
+        return Ok(count);
+    }
+}

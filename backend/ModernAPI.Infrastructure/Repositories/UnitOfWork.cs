@@ -21,6 +21,11 @@ public class UnitOfWork : IUnitOfWork
     private IUserRepository? _users;
 
     /// <summary>
+    /// Lazy-loaded refresh token repository instance.
+    /// </summary>
+    private IRefreshTokenRepository? _refreshTokens;
+
+    /// <summary>
     /// Initializes a new instance of the UnitOfWork.
     /// </summary>
     /// <param name="context">The application database context</param>
@@ -37,6 +42,17 @@ public class UnitOfWork : IUnitOfWork
             // Lazy initialization of repository
             _users ??= new UserRepository(_context);
             return _users;
+        }
+    }
+
+    /// <inheritdoc />
+    public IRefreshTokenRepository RefreshTokens
+    {
+        get
+        {
+            // Lazy initialization of repository
+            _refreshTokens ??= new RefreshTokenRepository(_context);
+            return _refreshTokens;
         }
     }
 

@@ -62,6 +62,19 @@ public class NotFoundException : ApplicationException
         ResourceType = resourceType;
         ResourceId = resourceId;
     }
+
+    /// <summary>
+    /// Initializes a new NotFoundException with a custom message.
+    /// </summary>
+    /// <param name="resourceType">The type of resource (e.g., "User", "Product")</param>
+    /// <param name="resourceId">The identifier that was searched for</param>
+    /// <param name="message">Custom error message</param>
+    public NotFoundException(string resourceType, string resourceId, string message) 
+        : base("RESOURCE_NOT_FOUND", message)
+    {
+        ResourceType = resourceType;
+        ResourceId = resourceId;
+    }
 }
 
 /// <summary>
@@ -144,5 +157,53 @@ public class ConflictException : ApplicationException
     {
         Resource = resource;
         ConflictingValue = conflictingValue;
+    }
+}
+
+/// <summary>
+/// Exception thrown when a precondition for a request fails.
+/// Typically used for ETag mismatches in conditional requests.
+/// </summary>
+public class PreconditionFailedException : ApplicationException
+{
+    /// <summary>
+    /// The resource that failed the precondition check.
+    /// </summary>
+    public string Resource { get; }
+
+    /// <summary>
+    /// The expected precondition value.
+    /// </summary>
+    public string? ExpectedValue { get; }
+
+    /// <summary>
+    /// The actual precondition value.
+    /// </summary>
+    public string? ActualValue { get; }
+
+    /// <summary>
+    /// Initializes a new PreconditionFailedException.
+    /// </summary>
+    /// <param name="resource">The resource that failed the precondition</param>
+    /// <param name="message">Custom error message</param>
+    public PreconditionFailedException(string resource, string? message = null) 
+        : base("PRECONDITION_FAILED", message ?? $"The precondition for {resource} has failed")
+    {
+        Resource = resource;
+    }
+
+    /// <summary>
+    /// Initializes a new PreconditionFailedException with expected and actual values.
+    /// </summary>
+    /// <param name="resource">The resource that failed the precondition</param>
+    /// <param name="expectedValue">The expected precondition value</param>
+    /// <param name="actualValue">The actual precondition value</param>
+    /// <param name="message">Custom error message</param>
+    public PreconditionFailedException(string resource, string expectedValue, string actualValue, string? message = null) 
+        : base("PRECONDITION_FAILED", message ?? $"The precondition for {resource} has failed. Expected: {expectedValue}, Actual: {actualValue}")
+    {
+        Resource = resource;
+        ExpectedValue = expectedValue;
+        ActualValue = actualValue;
     }
 }

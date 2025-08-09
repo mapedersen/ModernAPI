@@ -3,7 +3,8 @@ using ModernAPI.Domain.ValueObjects;
 namespace ModernAPI.Application.DTOs;
 
 /// <summary>
-/// Data Transfer Object representing a user for API responses.
+/// Data Transfer Object representing a user for API responses with HATEOAS links.
+/// Provides hypermedia navigation based on user permissions and current context.
 /// </summary>
 /// <param name="Id">The unique identifier of the user</param>
 /// <param name="Email">The user's email address</param>
@@ -24,7 +25,7 @@ public record UserDto(
     bool IsEmailVerified,
     DateTime CreatedAt,
     DateTime UpdatedAt
-);
+) : HateoasDto;
 
 /// <summary>
 /// Request DTO for creating a new user.
@@ -51,6 +52,63 @@ public record UpdateUserProfileRequest(
     string? FirstName = null,
     string? LastName = null
 );
+
+/// <summary>
+/// DTO for partial updates using JSON Patch operations.
+/// This class represents the target object that patch operations are applied to.
+/// Only includes properties that are allowed to be patched for security.
+/// </summary>
+public class PatchUserProfileRequest
+{
+    /// <summary>
+    /// The user's display name.
+    /// </summary>
+    public string? DisplayName { get; set; }
+    
+    /// <summary>
+    /// The user's first name.
+    /// </summary>
+    public string? FirstName { get; set; }
+    
+    /// <summary>
+    /// The user's last name.
+    /// </summary>
+    public string? LastName { get; set; }
+
+    /// <summary>
+    /// Validates that the patch request contains valid data.
+    /// </summary>
+    /// <returns>True if valid, false otherwise</returns>
+    public bool IsValid()
+    {
+        // DisplayName is required if being updated
+        if (DisplayName != null && string.IsNullOrWhiteSpace(DisplayName))
+            return false;
+
+        // FirstName and LastName can be null or valid strings
+        if (FirstName != null && FirstName.Length > 100)
+            return false;
+            
+        if (LastName != null && LastName.Length > 100)
+            return false;
+
+        return true;
+    }
+
+    /// <summary>
+    /// Converts the patch request to an UpdateUserProfileRequest for processing.
+    /// </summary>
+    /// <param name="currentUser">Current user data to fill in missing values</param>
+    /// <returns>An UpdateUserProfileRequest</returns>
+    public UpdateUserProfileRequest ToUpdateRequest(UserDto currentUser)
+    {
+        return new UpdateUserProfileRequest(
+            DisplayName ?? currentUser.DisplayName,
+            FirstName ?? currentUser.FirstName,
+            LastName ?? currentUser.LastName
+        );
+    }
+}
 
 /// <summary>
 /// Request DTO for changing a user's email address.
@@ -133,14 +191,14 @@ public record GetUsersRequest(
 );
 
 /// <summary>
-/// Response DTO for user operations that includes success status and optional message.
+/// Response DTO for user operations that includes success status and optional message with HATEOAS links.
 /// </summary>
 /// <param name="User">The user data</param>
 /// <param name="Message">Optional success message</param>
 public record UserResponse(
     UserDto User,
     string? Message = null
-);
+) : HateoasDto;
 
 /// <summary>
 /// Response DTO for operations that don't return user data but need to indicate success.

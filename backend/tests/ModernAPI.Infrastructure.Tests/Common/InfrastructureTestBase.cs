@@ -114,7 +114,7 @@ public abstract class InfrastructureTestBase : IAsyncDisposable, IDisposable
     /// </summary>
     /// <param name="userId">The user ID to find</param>
     /// <returns>The user if found, null otherwise</returns>
-    protected async Task<User?> GetUserFromDatabase(UserId userId)
+    protected async Task<User?> GetUserFromDatabase(Guid userId)
     {
         return await DbContext.Users.AsNoTracking()
             .FirstOrDefaultAsync(u => u.Id == userId);

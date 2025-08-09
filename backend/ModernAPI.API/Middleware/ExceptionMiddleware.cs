@@ -45,8 +45,21 @@ public class ExceptionMiddleware
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "An unhandled exception occurred while processing request {Method} {Path}",
-                context.Request.Method, context.Request.Path);
+            // Enhanced logging with more context
+            using var logScope = _logger.BeginScope(new Dictionary<string, object>
+            {
+                ["RequestId"] = context.TraceIdentifier,
+                ["RequestPath"] = context.Request.Path,
+                ["RequestMethod"] = context.Request.Method,
+                ["UserAgent"] = context.Request.Headers.UserAgent.ToString(),
+                ["RemoteIpAddress"] = context.Connection.RemoteIpAddress?.ToString() ?? "Unknown",
+                ["UserId"] = context.User?.Identity?.Name ?? "Anonymous"
+            });
+
+            _logger.LogError(ex, 
+                "Unhandled exception occurred. RequestId: {RequestId}, Path: {Method} {Path}, User: {User}",
+                context.TraceIdentifier, context.Request.Method, context.Request.Path, 
+                context.User?.Identity?.Name ?? "Anonymous");
 
             await HandleExceptionAsync(context, ex);
         }
@@ -63,6 +76,10 @@ public class ExceptionMiddleware
         var problemDetails = CreateProblemDetails(exception, context);
 
         context.Response.StatusCode = problemDetails.Status ?? (int)HttpStatusCode.InternalServerError;
+        
+        // Add security headers to prevent information disclosure
+        context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+        context.Response.Headers["X-Frame-Options"] = "DENY";
         context.Response.ContentType = "application/problem+json";
 
         var options = new JsonSerializerOptions
@@ -104,6 +121,15 @@ public class ExceptionMiddleware
                 Instance = context.Request.Path
             },
 
+            PreconditionFailedException preconditionEx => new ProblemDetails
+            {
+                Type = "https://tools.ietf.org/html/rfc7231#section-6.5.10",
+                Title = "Precondition Failed",
+                Status = (int)HttpStatusCode.PreconditionFailed, // 412
+                Detail = preconditionEx.Message,
+                Instance = context.Request.Path
+            },
+
             ModernAPI.Application.Common.Exceptions.ValidationException validationEx => CreateValidationProblemDetails(validationEx, context),
 
             // Domain layer exceptions
@@ -123,16 +149,35 @@ public class ExceptionMiddleware
                 Type = "https://tools.ietf.org/html/rfc7235#section-3.1",
                 Title = "Unauthorized",
                 Status = (int)HttpStatusCode.Unauthorized,
-                Detail = "You are not authorized to access this resource",
+                Detail = "Authentication is required to access this resource",
                 Instance = context.Request.Path
             },
 
             ArgumentException argEx => new ProblemDetails
             {
                 Type = "https://tools.ietf.org/html/rfc7231#section-6.5.1",
-                Title = "Invalid argument",
+                Title = "Bad Request",
                 Status = (int)HttpStatusCode.BadRequest,
                 Detail = argEx.Message,
+                Instance = context.Request.Path
+            },
+            
+            // Task cancellation (client disconnected)
+            TaskCanceledException => new ProblemDetails
+            {
+                Type = "https://tools.ietf.org/html/rfc7231#section-6.5.8",
+                Title = "Request Cancelled",
+                Status = (int)HttpStatusCode.RequestTimeout, // 408
+                Detail = "The request was cancelled",
+                Instance = context.Request.Path
+            },
+            
+            OperationCanceledException => new ProblemDetails
+            {
+                Type = "https://tools.ietf.org/html/rfc7231#section-6.5.8",
+                Title = "Operation Cancelled",
+                Status = (int)HttpStatusCode.RequestTimeout, // 408
+                Detail = "The operation was cancelled",
                 Instance = context.Request.Path
             },
 
@@ -145,12 +190,19 @@ public class ExceptionMiddleware
 
         // Add timestamp
         problemDetails.Extensions["timestamp"] = DateTimeOffset.UtcNow;
+        
+        // Add trace ID for distributed tracing (if available)
+        if (context.Request.Headers.TryGetValue("X-Trace-Id", out var traceId))
+        {
+            problemDetails.Extensions["traceId"] = traceId.ToString();
+        }
 
         return problemDetails;
     }
 
     /// <summary>
     /// Creates validation problem details for FluentValidation exceptions.
+    /// Uses 422 Unprocessable Entity for validation errors as per RFC 4918.
     /// </summary>
     /// <param name="validationException">The validation exception</param>
     /// <param name="context">The HTTP context</param>
@@ -161,9 +213,9 @@ public class ExceptionMiddleware
     {
         var problemDetails = new ValidationProblemDetails(validationException.ValidationErrors)
         {
-            Type = "https://tools.ietf.org/html/rfc7231#section-6.5.1",
+            Type = "https://tools.ietf.org/html/rfc4918#section-11.2",
             Title = "One or more validation errors occurred",
-            Status = (int)HttpStatusCode.BadRequest,
+            Status = (int)HttpStatusCode.UnprocessableEntity, // 422
             Instance = context.Request.Path
         };
 

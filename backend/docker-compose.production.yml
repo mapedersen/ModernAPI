@@ -1,0 +1,313 @@
+# ModernAPI Production Docker Compose
+# For production deployment with full monitoring stack
+
+version: '3.8'
+
+services:
+  # =============================================================================
+  # ModernAPI Application
+  # =============================================================================
+  modernapi:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    image: modernapi:latest
+    container_name: modernapi-app
+    restart: unless-stopped
+    networks:
+      - modernapi-network
+      - monitoring-network
+    ports:
+      - "8080:8080"
+    environment:
+      # Environment Detection
+      - ASPNETCORE_ENVIRONMENT=Production
+      
+      # Authentication (from external secrets)
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_ISSUER=${JWT_ISSUER:-ModernAPI}
+      - JWT_AUDIENCE=${JWT_AUDIENCE:-ModernAPI.Users}
+      
+      # Database
+      - POSTGRES_CONNECTION_STRING=${DATABASE_URL}
+      
+      # Logging & Monitoring
+      - SEQ_URL=http://seq:5341
+      - SEQ_API_KEY=${SEQ_API_KEY}
+      - LOG_LEVEL=${LOG_LEVEL:-Warning}
+      
+      # OpenTelemetry
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_SERVICE_NAME=ModernAPI
+      - OTEL_RESOURCE_ATTRIBUTES=environment=production
+      
+      # CORS & Security
+      - CORS_ORIGINS=${CORS_ORIGINS}
+      
+      # Feature Flags
+      - ENABLE_SWAGGER=false
+      - ENABLE_DETAILED_ERRORS=false
+      - ENABLE_SENSITIVE_DATA_LOGGING=false
+    
+    depends_on:
+      postgres:
+        condition: service_healthy
+      seq:
+        condition: service_started
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    
+    volumes:
+      - app-logs:/app/logs
+    
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.modernapi.rule=Host(`${API_DOMAIN:-api.localhost}`)"
+      - "traefik.http.routers.modernapi.tls=true"
+      - "traefik.http.services.modernapi.loadbalancer.server.port=8080"
+
+  # =============================================================================
+  # PostgreSQL Database
+  # =============================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: modernapi-postgres
+    restart: unless-stopped
+    networks:
+      - modernapi-network
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-modernapi}
+      - POSTGRES_USER=${POSTGRES_USER:-modernapi_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_INITDB_ARGS="--auth-host=scram-sha-256"
+    
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-modernapi_user} -d ${POSTGRES_DB:-modernapi}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    
+    command: >
+      postgres -c max_connections=200
+               -c shared_buffers=256MB
+               -c effective_cache_size=1GB
+               -c work_mem=4MB
+               -c maintenance_work_mem=64MB
+               -c checkpoint_completion_target=0.9
+               -c wal_buffers=16MB
+               -c default_statistics_target=100
+
+  # =============================================================================
+  # Reverse Proxy (Traefik)
+  # =============================================================================
+  traefik:
+    image: traefik:v3.0
+    container_name: modernapi-traefik
+    restart: unless-stopped
+    networks:
+      - modernapi-network
+      - monitoring-network
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8081:8080"  # Traefik dashboard
+    
+    environment:
+      - TRAEFIK_API_DASHBOARD=true
+      - TRAEFIK_API_INSECURE=false
+      - TRAEFIK_ENTRYPOINTS_WEB_ADDRESS=:80
+      - TRAEFIK_ENTRYPOINTS_WEBSECURE_ADDRESS=:443
+      - TRAEFIK_CERTIFICATESRESOLVERS_LETSENCRYPT_ACME_EMAIL=${ACME_EMAIL}
+      - TRAEFIK_CERTIFICATESRESOLVERS_LETSENCRYPT_ACME_STORAGE=/letsencrypt/acme.json
+      - TRAEFIK_CERTIFICATESRESOLVERS_LETSENCRYPT_ACME_HTTPCHALLENGE_ENTRYPOINT=web
+      - TRAEFIK_PROVIDERS_DOCKER=true
+      - TRAEFIK_PROVIDERS_DOCKER_EXPOSEDBYDEFAULT=false
+    
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik-letsencrypt:/letsencrypt
+    
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.${DOMAIN:-localhost}`)"
+      - "traefik.http.routers.traefik.tls=true"
+      - "traefik.http.services.traefik.loadbalancer.server.port=8080"
+
+  # =============================================================================
+  # Monitoring Stack
+  # =============================================================================
+  
+  # Seq - Centralized Logging
+  seq:
+    image: datalust/seq:latest
+    container_name: modernapi-seq
+    restart: unless-stopped
+    networks:
+      - monitoring-network
+    environment:
+      - ACCEPT_EULA=Y
+      - SEQ_FIRSTRUN_ADMINPASSWORDHASH=${SEQ_ADMIN_PASSWORD_HASH}
+    
+    volumes:
+      - seq-data:/data
+    
+    ports:
+      - "${SEQ_PORT:-5341}:80"
+    
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.seq.rule=Host(`logs.${DOMAIN:-localhost}`)"
+      - "traefik.http.routers.seq.tls=true"
+
+  # Prometheus - Metrics Storage
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: modernapi-prometheus
+    restart: unless-stopped
+    networks:
+      - monitoring-network
+    
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/alerts:/etc/prometheus/alerts:ro
+      - prometheus-data:/prometheus
+    
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.prometheus.rule=Host(`metrics.${DOMAIN:-localhost}`)"
+      - "traefik.http.routers.prometheus.tls=true"
+
+  # Grafana - Visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: modernapi-grafana
+    restart: unless-stopped
+    networks:
+      - monitoring-network
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    
+    depends_on:
+      - prometheus
+    
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.grafana.rule=Host(`dashboard.${DOMAIN:-localhost}`)"
+      - "traefik.http.routers.grafana.tls=true"
+
+  # OpenTelemetry Collector
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: modernapi-otel-collector
+    restart: unless-stopped
+    networks:
+      - modernapi-network
+      - monitoring-network
+    
+    volumes:
+      - ./monitoring/otel/otel-collector-config.yml:/etc/otel-collector-config.yml:ro
+    
+    command: ["--config=/etc/otel-collector-config.yml"]
+    
+    ports:
+      - "4317:4317"   # OTLP gRPC receiver
+      - "4318:4318"   # OTLP HTTP receiver
+    
+    depends_on:
+      - prometheus
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  modernapi-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+  
+  monitoring-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  postgres-data:
+    driver: local
+  
+  app-logs:
+    driver: local
+  
+  seq-data:
+    driver: local
+  
+  prometheus-data:
+    driver: local
+  
+  grafana-data:
+    driver: local
+  
+  traefik-letsencrypt:
+    driver: local

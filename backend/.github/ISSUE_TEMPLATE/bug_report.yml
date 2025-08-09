@@ -1,0 +1,160 @@
+name: 🐛 Bug Report
+description: Report a bug or issue with ModernAPI
+title: "[BUG] "
+labels: ["bug", "triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill out the information below to help us reproduce and fix the issue.
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Bug Severity
+      description: How severe is this bug?
+      options:
+        - Critical - System down, security vulnerability, data loss
+        - High - Major functionality broken, many users affected
+        - Medium - Feature partially working, some users affected
+        - Low - Minor issue, cosmetic problem, edge case
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is.
+      placeholder: Describe what happened and what you expected to happen...
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Detailed steps to reproduce the behavior
+      placeholder: |
+        1. Go to '...'
+        2. Click on '....'
+        3. Scroll down to '....'
+        4. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What should have happened instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Environment
+      description: Which environment is affected?
+      options:
+        - Production
+        - Staging
+        - Development
+        - Local
+        - Multiple environments
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: What version of ModernAPI is affected?
+      placeholder: "v1.2.3 or commit hash"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: browsers
+    attributes:
+      label: Browser (if applicable)
+      description: Which browsers are affected?
+      multiple: true
+      options:
+        - Chrome
+        - Firefox
+        - Safari
+        - Edge
+        - Other
+        - N/A - API only
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error Logs
+      description: Any relevant error logs, stack traces, or error messages
+      render: shell
+      placeholder: |
+        Paste error logs here...
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any additional information that might be helpful
+      placeholder: Screenshots, network requests, related issues, etc.
+
+  - type: checkboxes
+    id: impact
+    attributes:
+      label: Impact Assessment
+      description: Who is affected by this bug?
+      options:
+        - label: All users affected
+        - label: Specific user group affected
+        - label: Admin users only
+        - label: New users only
+        - label: Existing users only
+        - label: API consumers affected
+        - label: Internal systems affected
+
+  - type: checkboxes
+    id: workaround
+    attributes:
+      label: Workaround Available
+      options:
+        - label: I have found a workaround for this issue
+        - label: No workaround available
+        - label: Workaround is too complex for users
+
+  - type: textarea
+    id: workaround-details
+    attributes:
+      label: Workaround Details
+      description: If you found a workaround, please describe it
+      placeholder: Steps for the workaround...
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Submission Checklist
+      description: Before submitting, please confirm:
+      options:
+        - label: I have searched for existing issues and this is not a duplicate
+          required: true
+        - label: I have provided all the required information
+          required: true
+        - label: I can reproduce this issue consistently
+          required: true
+        - label: This issue is related to ModernAPI (not a client-side issue)
+          required: true

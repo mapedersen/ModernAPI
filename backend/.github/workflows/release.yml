@@ -1,0 +1,524 @@
+name: 📦 Release Management
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/PULL_REQUEST_TEMPLATE/**'
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: 'Type of release'
+        required: true
+        default: 'auto'
+        type: choice
+        options:
+          - auto
+          - patch
+          - minor
+          - major
+          - prerelease
+      dry_run:
+        description: 'Dry run (no actual release)'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  NODE_VERSION: '18'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+# Concurrency: only one release at a time
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  # =============================================================================
+  # Analyze Commits for Release Decision
+  # =============================================================================
+  analyze:
+    name: 🔍 Analyze Commits
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    outputs:
+      should_release: ${{ steps.analysis.outputs.should_release }}
+      release_type: ${{ steps.analysis.outputs.release_type }}
+      current_version: ${{ steps.analysis.outputs.current_version }}
+      next_version: ${{ steps.analysis.outputs.next_version }}
+      changelog: ${{ steps.analysis.outputs.changelog }}
+      
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: ⚡ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          
+      - name: 📦 Install semantic-release
+        run: |
+          npm ci --only=dev
+          npm install -g semantic-release@22.0.12
+          
+      - name: 🔍 Analyze commits and determine release
+        id: analysis
+        run: |
+          echo "🔍 Analyzing commits for release decisions..."
+          
+          # Get current version
+          CURRENT_VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "📋 Current version: $CURRENT_VERSION"
+          
+          # Run semantic-release in dry-run mode to analyze
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.release_type }}" != "auto" ]]; then
+            # Manual release with specified type
+            RELEASE_TYPE="${{ github.event.inputs.release_type }}"
+            SHOULD_RELEASE="true"
+            echo "🎯 Manual release requested: $RELEASE_TYPE"
+          else
+            # Automatic release based on conventional commits
+            export GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}"
+            
+            # Analyze commits since last release
+            SEMANTIC_OUTPUT=$(semantic-release --dry-run --no-ci 2>&1 || true)
+            
+            if echo "$SEMANTIC_OUTPUT" | grep -q "The next release version is"; then
+              SHOULD_RELEASE="true"
+              NEXT_VERSION=$(echo "$SEMANTIC_OUTPUT" | grep "The next release version is" | sed 's/.*The next release version is //' | head -n1)
+              
+              # Determine release type based on semantic analysis
+              if echo "$SEMANTIC_OUTPUT" | grep -q "BREAKING CHANGE"; then
+                RELEASE_TYPE="major"
+              elif echo "$SEMANTIC_OUTPUT" | grep -q "feat"; then
+                RELEASE_TYPE="minor"
+              else
+                RELEASE_TYPE="patch"
+              fi
+            else
+              SHOULD_RELEASE="false"
+              RELEASE_TYPE="none"
+              NEXT_VERSION="$CURRENT_VERSION"
+            fi
+          fi
+          
+          echo "should_release=$SHOULD_RELEASE" >> $GITHUB_OUTPUT
+          echo "release_type=$RELEASE_TYPE" >> $GITHUB_OUTPUT
+          echo "next_version=$NEXT_VERSION" >> $GITHUB_OUTPUT
+          
+          echo "📊 Release Analysis:"
+          echo "  Should Release: $SHOULD_RELEASE"
+          echo "  Release Type: $RELEASE_TYPE"
+          echo "  Next Version: $NEXT_VERSION"
+          
+      - name: 📝 Generate preliminary changelog
+        if: steps.analysis.outputs.should_release == 'true'
+        id: changelog
+        run: |
+          echo "📝 Generating changelog for release..."
+          
+          # Generate changelog using conventional-changelog
+          npx conventional-changelog -p angular -r 2 -t "" | head -n 100 > changelog_preview.md
+          
+          # Escape the changelog content for GitHub output
+          CHANGELOG_CONTENT=$(cat changelog_preview.md | head -c 8000)  # Limit size
+          
+          # Use heredoc to handle multiline content
+          {
+            echo 'changelog<<EOF'
+            echo "$CHANGELOG_CONTENT"
+            echo 'EOF'
+          } >> $GITHUB_OUTPUT
+          
+      - name: 📋 Release decision summary
+        run: |
+          echo "## 📦 Release Analysis Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Current Version:** ${{ steps.analysis.outputs.current_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Should Release:** ${{ steps.analysis.outputs.should_release }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Release Type:** ${{ steps.analysis.outputs.release_type }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Next Version:** ${{ steps.analysis.outputs.next_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ "${{ steps.analysis.outputs.should_release }}" == "true" ]]; then
+            echo "✅ **Release will be created**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "ℹ️ **No release needed** - no significant changes since last release" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+  # =============================================================================
+  # Create Release
+  # =============================================================================
+  release:
+    name: 📦 Create Release
+    runs-on: ubuntu-latest
+    needs: [analyze]
+    if: |
+      needs.analyze.outputs.should_release == 'true' &&
+      github.event.inputs.dry_run != 'true'
+    timeout-minutes: 15
+    
+    outputs:
+      version: ${{ steps.semantic_release.outputs.version }}
+      release_url: ${{ steps.semantic_release.outputs.release_url }}
+      
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: ⚡ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          
+      - name: 📦 Install dependencies
+        run: npm ci --only=dev
+        
+      - name: 🔧 Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          
+      - name: 📦 Run semantic-release
+        id: semantic_release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "📦 Creating release with semantic-release..."
+          
+          # Run semantic-release
+          npx semantic-release 2>&1 | tee semantic_release_output.log
+          
+          # Extract version and release info
+          if grep -q "Published release" semantic_release_output.log; then
+            VERSION=$(grep "Published release" semantic_release_output.log | sed 's/.*Published release \(.*\) on .*/\1/')
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+            echo "✅ Release $VERSION published successfully"
+            
+            # Get release URL
+            RELEASE_URL="https://github.com/${{ github.repository }}/releases/tag/$VERSION"
+            echo "release_url=$RELEASE_URL" >> $GITHUB_OUTPUT
+            
+          else
+            echo "❌ Release creation failed"
+            cat semantic_release_output.log
+            exit 1
+          fi
+          
+      - name: 📊 Upload release artifacts
+        if: steps.semantic_release.outputs.version
+        run: |
+          VERSION="${{ steps.semantic_release.outputs.version }}"
+          
+          echo "📊 Preparing release artifacts..."
+          
+          # Create release info file
+          cat > release-info.json << EOF
+          {
+            "version": "$VERSION",
+            "releaseDate": "$(date -u --iso-8601=seconds)",
+            "gitCommit": "${{ github.sha }}",
+            "buildNumber": "${{ github.run_number }}",
+            "dockerImage": "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$VERSION",
+            "releaseUrl": "${{ steps.semantic_release.outputs.release_url }}"
+          }
+          EOF
+          
+          # Create deployment checklist
+          cat > deployment-checklist.md << 'EOF'
+          # 🚀 Deployment Checklist
+          
+          ## Pre-deployment
+          - [ ] All CI checks passed
+          - [ ] Security scan completed
+          - [ ] Docker image built and tested
+          - [ ] Staging deployment successful
+          
+          ## Production Deployment
+          - [ ] Database backup created
+          - [ ] Blue-green deployment ready
+          - [ ] Monitoring alerts configured
+          - [ ] Rollback plan confirmed
+          
+          ## Post-deployment
+          - [ ] Health checks passing
+          - [ ] Performance metrics normal
+          - [ ] User acceptance testing
+          - [ ] Documentation updated
+          
+          EOF
+          
+          echo "✅ Release artifacts prepared"
+          
+  # =============================================================================
+  # Update Documentation
+  # =============================================================================
+  update-docs:
+    name: 📚 Update Documentation
+    runs-on: ubuntu-latest
+    needs: [analyze, release]
+    if: needs.release.outputs.version
+    timeout-minutes: 10
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: 📚 Update version in documentation
+        run: |
+          VERSION="${{ needs.release.outputs.version }}"
+          
+          echo "📚 Updating documentation with version $VERSION..."
+          
+          # Update README badges
+          if [[ -f README.md ]]; then
+            sed -i "s/\(version-\)[^-]*\(-blue\)/\1$VERSION\2/g" README.md
+            sed -i "s/\(releases\/tag\/\)[^)]*\()\)/\1$VERSION\2/g" README.md
+          fi
+          
+          # Update Docker compose files with new image tag
+          find . -name "docker-compose*.yml" -exec sed -i "s/modernapi:latest/modernapi:$VERSION/g" {} \;
+          
+          # Update Kubernetes manifests
+          find k8s/ -name "*.yml" -exec sed -i "s/modernapi:latest/modernapi:$VERSION/g" {} \; 2>/dev/null || true
+          
+          # Update version in package.json if it wasn't updated by semantic-release
+          if [[ -f package.json ]]; then
+            jq ".version = \"$VERSION\"" package.json > package.json.tmp && mv package.json.tmp package.json
+          fi
+          
+      - name: 📝 Update TODO.md with release
+        run: |
+          VERSION="${{ needs.release.outputs.version }}"
+          
+          if [[ -f TODO.md ]]; then
+            # Add release entry to TODO.md
+            sed -i "/^## 📚 Documentation Links/i\\
+### Release $VERSION ✅\\
+- [x] Version $VERSION released on $(date -u +%Y-%m-%d)\\
+- [x] Release notes: ${{ needs.release.outputs.release_url }}\\
+- [x] Docker image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$VERSION\\
+- [x] Deployment ready\\
+\\
+" TODO.md
+          fi
+          
+      - name: 💾 Commit documentation updates
+        run: |
+          git add .
+          
+          if git diff --staged --quiet; then
+            echo "No documentation changes to commit"
+          else
+            git commit -m "docs: update documentation for release ${{ needs.release.outputs.version }} [skip ci]"
+            git push origin main
+            echo "✅ Documentation updated"
+          fi
+          
+  # =============================================================================
+  # Trigger Deployment
+  # =============================================================================
+  trigger-deployment:
+    name: 🚀 Trigger Production Deployment
+    runs-on: ubuntu-latest
+    needs: [analyze, release]
+    if: |
+      needs.release.outputs.version &&
+      vars.AUTO_DEPLOY_PRODUCTION == 'true'
+    
+    steps:
+      - name: 🚀 Trigger production deployment workflow
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const response = await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'deploy-production.yml',
+              ref: 'main',
+              inputs: {
+                version: '${{ needs.release.outputs.version }}',
+                deployment_type: 'blue-green',
+                skip_approval: 'false'
+              }
+            });
+            
+            console.log('🚀 Production deployment workflow triggered');
+            console.log(`Workflow run: https://github.com/${context.repo.owner}/${context.repo.repo}/actions`);
+            
+  # =============================================================================
+  # Post-release Notifications
+  # =============================================================================
+  notify:
+    name: 📢 Release Notifications
+    runs-on: ubuntu-latest
+    needs: [analyze, release, update-docs]
+    if: always() && needs.release.outputs.version
+    
+    steps:
+      - name: 📊 Generate release summary
+        run: |
+          VERSION="${{ needs.release.outputs.version }}"
+          RELEASE_URL="${{ needs.release.outputs.release_url }}"
+          
+          echo "## 🎉 Release $VERSION Created Successfully!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**📦 Release Details:**" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** $VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "- **Release Type:** ${{ needs.analyze.outputs.release_type }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Release Notes:** $RELEASE_URL" >> $GITHUB_STEP_SUMMARY
+          echo "- **Docker Image:** ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**🔗 Quick Links:**" >> $GITHUB_STEP_SUMMARY
+          echo "- [📦 GitHub Release]($RELEASE_URL)" >> $GITHUB_STEP_SUMMARY
+          echo "- [🐳 Docker Image](https://${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$VERSION)" >> $GITHUB_STEP_SUMMARY
+          echo "- [📚 Documentation](https://github.com/${{ github.repository }}#readme)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**⏭️ Next Steps:**" >> $GITHUB_STEP_SUMMARY
+          echo "1. Review the release notes and changelog" >> $GITHUB_STEP_SUMMARY
+          echo "2. Test the release in staging environment" >> $GITHUB_STEP_SUMMARY
+          echo "3. Schedule production deployment" >> $GITHUB_STEP_SUMMARY
+          echo "4. Monitor post-deployment metrics" >> $GITHUB_STEP_SUMMARY
+          
+      # Optional: Add external notifications
+      # - name: 📱 Slack notification
+      #   if: always()
+      #   uses: 8398a7/action-slack@v3
+      #   with:
+      #     status: ${{ job.status }}
+      #     text: |
+      #       🎉 New release created: ${{ needs.release.outputs.version }}
+      #       📦 Release: ${{ needs.release.outputs.release_url }}
+      #       🐳 Docker: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.release.outputs.version }}
+      #     webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+      
+      # - name: 📧 Email notification
+      #   if: always()
+      #   uses: dawidd6/action-send-mail@v3
+      #   with:
+      #     server_address: smtp.gmail.com
+      #     server_port: 587
+      #     username: ${{ secrets.EMAIL_USERNAME }}
+      #     password: ${{ secrets.EMAIL_PASSWORD }}
+      #     subject: "🎉 ModernAPI Release ${{ needs.release.outputs.version }}"
+      #     body: |
+      #       A new release has been created!
+      #       
+      #       Version: ${{ needs.release.outputs.version }}
+      #       Release Notes: ${{ needs.release.outputs.release_url }}
+      #       Docker Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.release.outputs.version }}
+      #     to: developers@yourdomain.com
+      
+  # =============================================================================
+  # Cleanup Old Releases
+  # =============================================================================
+  cleanup:
+    name: 🧹 Cleanup Old Releases
+    runs-on: ubuntu-latest
+    needs: [release]
+    if: |
+      needs.release.outputs.version &&
+      github.event_name != 'workflow_dispatch'
+    timeout-minutes: 10
+    
+    steps:
+      - name: 🧹 Clean up old pre-releases
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const keepCount = 5; // Keep last 5 pre-releases
+            
+            try {
+              // Get all releases
+              const releases = await github.rest.repos.listReleases({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                per_page: 100
+              });
+              
+              // Filter pre-releases and sort by creation date
+              const preReleases = releases.data
+                .filter(release => release.prerelease)
+                .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+              
+              // Delete old pre-releases beyond keepCount
+              const releasesToDelete = preReleases.slice(keepCount);
+              
+              for (const release of releasesToDelete) {
+                console.log(`🗑️ Deleting old pre-release: ${release.tag_name} (${release.created_at})`);
+                await github.rest.repos.deleteRelease({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  release_id: release.id
+                });
+                
+                // Also delete the tag
+                try {
+                  await github.rest.git.deleteRef({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    ref: `tags/${release.tag_name}`
+                  });
+                } catch (error) {
+                  console.log(`Warning: Could not delete tag ${release.tag_name}: ${error.message}`);
+                }
+              }
+              
+              console.log(`✅ Cleaned up ${releasesToDelete.length} old pre-releases`);
+            } catch (error) {
+              console.log(`ℹ️ Cleanup not needed or failed: ${error.message}`);
+            }
+            
+  # =============================================================================
+  # Dry Run Summary
+  # =============================================================================
+  dry-run-summary:
+    name: 🔍 Dry Run Summary
+    runs-on: ubuntu-latest
+    needs: [analyze]
+    if: |
+      always() &&
+      github.event.inputs.dry_run == 'true'
+    
+    steps:
+      - name: 📋 Dry run results
+        run: |
+          echo "## 🔍 Dry Run Results" >> $GITHUB_STEP_SUMMARY
+          echo "**This was a dry run - no actual release was created.**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Analysis Results:**" >> $GITHUB_STEP_SUMMARY
+          echo "- **Current Version:** ${{ needs.analyze.outputs.current_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Would Release:** ${{ needs.analyze.outputs.should_release }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Release Type:** ${{ needs.analyze.outputs.release_type }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Next Version:** ${{ needs.analyze.outputs.next_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ "${{ needs.analyze.outputs.should_release }}" == "true" ]]; then
+            echo "✅ **A release would be created if this wasn't a dry run**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Preview Changelog:**" >> $GITHUB_STEP_SUMMARY
+            echo '```markdown' >> $GITHUB_STEP_SUMMARY
+            echo '${{ needs.analyze.outputs.changelog }}' >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          else
+            echo "ℹ️ **No release would be created** - no significant changes detected" >> $GITHUB_STEP_SUMMARY
+          fi

@@ -33,6 +33,7 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.8" />
     <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="9.0.8" />
     <PackageReference Include="AspNetCore.HealthChecks.Npgsql" Version="8.0.2" />
+    <PackageReference Include="AspNetCore.HealthChecks.Redis" Version="9.0.0" />
     <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="9.0.8" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="9.0.8" />
     <PackageReference Include="DotNetEnv" Version="3.1.1" />
@@ -40,6 +41,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../ModernAPI.Domain/ModernAPI.Domain.csproj" />
+    <ProjectReference Include="../ModernAPI.Application/ModernAPI.Application.csproj" />
   </ItemGroup>
 
 </Project>

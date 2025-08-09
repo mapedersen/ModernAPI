@@ -1,0 +1,613 @@
+name: 📢 CI/CD Notifications
+
+on:
+  workflow_run:
+    workflows: 
+      - "🔄 Continuous Integration"
+      - "🐳 Docker Build & Registry"
+      - "🚀 Deploy to Staging"
+      - "🚀 Deploy to Production"
+      - "📦 Release Management"
+      - "🔒 Security Scanning"
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      test_notification:
+        description: 'Test notification type'
+        required: true
+        default: 'slack'
+        type: choice
+        options:
+          - slack
+          - teams
+          - discord
+          - email
+
+env:
+  WORKFLOW_ICONS:
+    ci: "🔄"
+    docker: "🐳"
+    deploy-staging: "🚀"
+    deploy-production: "🎯"
+    release: "📦"
+    security: "🔒"
+
+jobs:
+  # =============================================================================
+  # Determine Notification Context
+  # =============================================================================
+  analyze-workflow:
+    name: 🔍 Analyze Workflow Run
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    
+    outputs:
+      workflow_name: ${{ steps.context.outputs.workflow_name }}
+      workflow_status: ${{ steps.context.outputs.workflow_status }}
+      workflow_conclusion: ${{ steps.context.outputs.workflow_conclusion }}
+      branch: ${{ steps.context.outputs.branch }}
+      environment: ${{ steps.context.outputs.environment }}
+      should_notify: ${{ steps.context.outputs.should_notify }}
+      notification_level: ${{ steps.context.outputs.notification_level }}
+      
+    steps:
+      - name: 🔍 Extract workflow context
+        id: context
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            # Test notification
+            echo "workflow_name=test-notification" >> $GITHUB_OUTPUT
+            echo "workflow_status=success" >> $GITHUB_OUTPUT
+            echo "workflow_conclusion=success" >> $GITHUB_OUTPUT
+            echo "branch=main" >> $GITHUB_OUTPUT
+            echo "environment=test" >> $GITHUB_OUTPUT
+            echo "should_notify=true" >> $GITHUB_OUTPUT
+            echo "notification_level=info" >> $GITHUB_OUTPUT
+          else
+            # Real workflow run
+            WORKFLOW_NAME="${{ github.event.workflow_run.name }}"
+            WORKFLOW_STATUS="${{ github.event.workflow_run.status }}"
+            WORKFLOW_CONCLUSION="${{ github.event.workflow_run.conclusion }}"
+            BRANCH="${{ github.event.workflow_run.head_branch }}"
+            
+            echo "workflow_name=$WORKFLOW_NAME" >> $GITHUB_OUTPUT
+            echo "workflow_status=$WORKFLOW_STATUS" >> $GITHUB_OUTPUT
+            echo "workflow_conclusion=$WORKFLOW_CONCLUSION" >> $GITHUB_OUTPUT
+            echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+            
+            # Determine environment
+            if [[ "$BRANCH" == "main" ]]; then
+              ENVIRONMENT="production"
+            elif [[ "$BRANCH" == "develop" ]]; then
+              ENVIRONMENT="staging"
+            else
+              ENVIRONMENT="development"
+            fi
+            echo "environment=$ENVIRONMENT" >> $GITHUB_OUTPUT
+            
+            # Determine if we should notify
+            SHOULD_NOTIFY="false"
+            NOTIFICATION_LEVEL="info"
+            
+            # Always notify for production and critical workflows
+            if [[ "$ENVIRONMENT" == "production" ]] || 
+               [[ "$WORKFLOW_NAME" =~ "Production" ]] ||
+               [[ "$WORKFLOW_NAME" =~ "Release" ]] ||
+               [[ "$WORKFLOW_NAME" =~ "Security" ]]; then
+              SHOULD_NOTIFY="true"
+              
+              if [[ "$WORKFLOW_CONCLUSION" == "failure" ]]; then
+                NOTIFICATION_LEVEL="critical"
+              elif [[ "$WORKFLOW_CONCLUSION" == "success" && "$ENVIRONMENT" == "production" ]]; then
+                NOTIFICATION_LEVEL="success"
+              fi
+            fi
+            
+            # Notify on failures for any environment
+            if [[ "$WORKFLOW_CONCLUSION" == "failure" ]]; then
+              SHOULD_NOTIFY="true"
+              if [[ "$ENVIRONMENT" == "production" ]]; then
+                NOTIFICATION_LEVEL="critical"
+              else
+                NOTIFICATION_LEVEL="warning"
+              fi
+            fi
+            
+            # Notify on staging deployments
+            if [[ "$WORKFLOW_NAME" =~ "Staging" && "$WORKFLOW_CONCLUSION" == "success" ]]; then
+              SHOULD_NOTIFY="true"
+              NOTIFICATION_LEVEL="info"
+            fi
+            
+            echo "should_notify=$SHOULD_NOTIFY" >> $GITHUB_OUTPUT
+            echo "notification_level=$NOTIFICATION_LEVEL" >> $GITHUB_OUTPUT
+          fi
+          
+          echo "📊 Notification Context:"
+          echo "  Workflow: $WORKFLOW_NAME"
+          echo "  Status: $WORKFLOW_STATUS"
+          echo "  Conclusion: $WORKFLOW_CONCLUSION"
+          echo "  Branch: $BRANCH"
+          echo "  Environment: $ENVIRONMENT"
+          echo "  Should Notify: $SHOULD_NOTIFY"
+          echo "  Level: $NOTIFICATION_LEVEL"
+          
+  # =============================================================================
+  # Slack Notifications
+  # =============================================================================
+  slack-notification:
+    name: 📱 Slack Notification
+    runs-on: ubuntu-latest
+    needs: [analyze-workflow]
+    if: |
+      needs.analyze-workflow.outputs.should_notify == 'true' &&
+      secrets.SLACK_WEBHOOK_URL != ''
+    timeout-minutes: 5
+    
+    steps:
+      - name: 📱 Send Slack notification
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ needs.analyze-workflow.outputs.workflow_conclusion }}
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          channel: |
+            ${{
+              needs.analyze-workflow.outputs.notification_level == 'critical' && '#alerts' ||
+              needs.analyze-workflow.outputs.environment == 'production' && '#production' ||
+              '#development'
+            }}
+          username: 'ModernAPI CI/CD'
+          icon_emoji: |
+            ${{
+              needs.analyze-workflow.outputs.notification_level == 'critical' && ':rotating_light:' ||
+              needs.analyze-workflow.outputs.workflow_conclusion == 'success' && ':white_check_mark:' ||
+              ':x:'
+            }}
+          title: |
+            ${{
+              needs.analyze-workflow.outputs.notification_level == 'critical' && '🚨 CRITICAL' ||
+              needs.analyze-workflow.outputs.notification_level == 'warning' && '⚠️ WARNING' ||
+              needs.analyze-workflow.outputs.notification_level == 'success' && '✅ SUCCESS' ||
+              'ℹ️ INFO'
+            }} ${{ needs.analyze-workflow.outputs.workflow_name }}
+          text: |
+            **Repository:** ${{ github.repository }}
+            **Branch:** ${{ needs.analyze-workflow.outputs.branch }}
+            **Environment:** ${{ needs.analyze-workflow.outputs.environment }}
+            **Status:** ${{ needs.analyze-workflow.outputs.workflow_conclusion }}
+            **Run:** <https://github.com/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id }}|View Details>
+            
+            ${{
+              needs.analyze-workflow.outputs.workflow_conclusion == 'failure' && 
+              ':warning: *Immediate attention required!*' ||
+              needs.analyze-workflow.outputs.workflow_name == 'Deploy to Production' &&
+              needs.analyze-workflow.outputs.workflow_conclusion == 'success' &&
+              ':rocket: *Production deployment completed successfully!*' ||
+              ''
+            }}
+          color: |
+            ${{
+              needs.analyze-workflow.outputs.notification_level == 'critical' && 'danger' ||
+              needs.analyze-workflow.outputs.notification_level == 'warning' && 'warning' ||
+              needs.analyze-workflow.outputs.notification_level == 'success' && 'good' ||
+              '#36a64f'
+            }}
+          fields: |
+            {
+              "title": "Commit",
+              "value": "${{ github.event.workflow_run.head_sha }}",
+              "short": true
+            },
+            {
+              "title": "Author", 
+              "value": "${{ github.event.workflow_run.actor.login }}",
+              "short": true
+            },
+            {
+              "title": "Duration",
+              "value": "${{ github.event.workflow_run.run_duration_ms }}ms",
+              "short": true
+            },
+            {
+              "title": "Triggered",
+              "value": "${{ github.event.workflow_run.created_at }}",
+              "short": true
+            }
+          
+  # =============================================================================
+  # Microsoft Teams Notifications
+  # =============================================================================
+  teams-notification:
+    name: 📢 Teams Notification
+    runs-on: ubuntu-latest
+    needs: [analyze-workflow]
+    if: |
+      needs.analyze-workflow.outputs.should_notify == 'true' &&
+      secrets.TEAMS_WEBHOOK_URL != ''
+    timeout-minutes: 5
+    
+    steps:
+      - name: 📢 Send Teams notification
+        run: |
+          # Determine color based on status
+          case "${{ needs.analyze-workflow.outputs.notification_level }}" in
+            "critical") COLOR="FF0000" ;;
+            "warning") COLOR="FFA500" ;;
+            "success") COLOR="00FF00" ;;
+            *) COLOR="0078D4" ;;
+          esac
+          
+          # Determine icon
+          case "${{ needs.analyze-workflow.outputs.workflow_conclusion }}" in
+            "success") ICON="✅" ;;
+            "failure") ICON="❌" ;;
+            *) ICON="ℹ️" ;;
+          esac
+          
+          # Create Teams message payload
+          cat > teams-message.json << EOF
+          {
+            "@type": "MessageCard",
+            "@context": "http://schema.org/extensions",
+            "themeColor": "$COLOR",
+            "summary": "$ICON ModernAPI CI/CD Notification",
+            "sections": [{
+              "activityTitle": "$ICON ${{ needs.analyze-workflow.outputs.workflow_name }}",
+              "activitySubtitle": "Repository: ${{ github.repository }}",
+              "activityImage": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
+              "facts": [
+                {"name": "Status", "value": "${{ needs.analyze-workflow.outputs.workflow_conclusion }}"},
+                {"name": "Branch", "value": "${{ needs.analyze-workflow.outputs.branch }}"},
+                {"name": "Environment", "value": "${{ needs.analyze-workflow.outputs.environment }}"},
+                {"name": "Author", "value": "${{ github.event.workflow_run.actor.login }}"},
+                {"name": "Commit", "value": "${{ github.event.workflow_run.head_sha }}"}
+              ],
+              "markdown": true
+            }],
+            "potentialAction": [{
+              "@type": "OpenUri",
+              "name": "View Workflow Run",
+              "targets": [{
+                "os": "default",
+                "uri": "https://github.com/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id }}"
+              }]
+            }]
+          }
+          EOF
+          
+          # Send to Teams
+          curl -X POST "${{ secrets.TEAMS_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d @teams-message.json
+            
+          echo "✅ Teams notification sent"
+          
+  # =============================================================================
+  # Discord Notifications
+  # =============================================================================
+  discord-notification:
+    name: 🎮 Discord Notification
+    runs-on: ubuntu-latest
+    needs: [analyze-workflow]
+    if: |
+      needs.analyze-workflow.outputs.should_notify == 'true' &&
+      secrets.DISCORD_WEBHOOK_URL != ''
+    timeout-minutes: 5
+    
+    steps:
+      - name: 🎮 Send Discord notification
+        run: |
+          # Determine color (Discord uses decimal colors)
+          case "${{ needs.analyze-workflow.outputs.notification_level }}" in
+            "critical") COLOR="16711680" ;;  # Red
+            "warning") COLOR="16753920" ;;   # Orange  
+            "success") COLOR="65280" ;;      # Green
+            *) COLOR="3447003" ;;           # Blue
+          esac
+          
+          # Determine icon
+          case "${{ needs.analyze-workflow.outputs.workflow_conclusion }}" in
+            "success") ICON=":white_check_mark:" ;;
+            "failure") ICON=":x:" ;;
+            *) ICON=":information_source:" ;;
+          esac
+          
+          # Create Discord embed
+          cat > discord-message.json << EOF
+          {
+            "username": "ModernAPI CI/CD",
+            "avatar_url": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
+            "embeds": [{
+              "title": "$ICON ${{ needs.analyze-workflow.outputs.workflow_name }}",
+              "description": "**Repository:** ${{ github.repository }}\n**Branch:** ${{ needs.analyze-workflow.outputs.branch }}",
+              "color": $COLOR,
+              "fields": [
+                {
+                  "name": "Status",
+                  "value": "${{ needs.analyze-workflow.outputs.workflow_conclusion }}",
+                  "inline": true
+                },
+                {
+                  "name": "Environment", 
+                  "value": "${{ needs.analyze-workflow.outputs.environment }}",
+                  "inline": true
+                },
+                {
+                  "name": "Author",
+                  "value": "${{ github.event.workflow_run.actor.login }}",
+                  "inline": true
+                },
+                {
+                  "name": "Commit",
+                  "value": "\`${{ github.event.workflow_run.head_sha }}\`",
+                  "inline": false
+                }
+              ],
+              "url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id }}",
+              "timestamp": "${{ github.event.workflow_run.created_at }}",
+              "footer": {
+                "text": "ModernAPI CI/CD",
+                "icon_url": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png"
+              }
+            }]
+          }
+          EOF
+          
+          # Send to Discord
+          curl -X POST "${{ secrets.DISCORD_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d @discord-message.json
+            
+          echo "✅ Discord notification sent"
+          
+  # =============================================================================
+  # Email Notifications
+  # =============================================================================
+  email-notification:
+    name: 📧 Email Notification
+    runs-on: ubuntu-latest
+    needs: [analyze-workflow]
+    if: |
+      needs.analyze-workflow.outputs.should_notify == 'true' &&
+      secrets.SMTP_SERVER != '' &&
+      (needs.analyze-workflow.outputs.notification_level == 'critical' ||
+       needs.analyze-workflow.outputs.environment == 'production')
+    timeout-minutes: 5
+    
+    steps:
+      - name: 📧 Send email notification
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.SMTP_SERVER }}
+          server_port: ${{ secrets.SMTP_PORT || 587 }}
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: |
+            ${{
+              needs.analyze-workflow.outputs.notification_level == 'critical' && '[CRITICAL] ' ||
+              needs.analyze-workflow.outputs.notification_level == 'warning' && '[WARNING] ' ||
+              needs.analyze-workflow.outputs.environment == 'production' && '[PRODUCTION] ' ||
+              ''
+            }}ModernAPI: ${{ needs.analyze-workflow.outputs.workflow_name }}
+          to: ${{ secrets.NOTIFICATION_EMAIL }}
+          from: ${{ secrets.SMTP_FROM }}
+          html_body: |
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <title>ModernAPI CI/CD Notification</title>
+                <style>
+                    body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f5f5f5; }
+                    .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+                    .header { text-align: center; padding: 20px 0; border-bottom: 2px solid #eee; }
+                    .status { padding: 15px; margin: 20px 0; border-radius: 6px; text-align: center; font-weight: bold; }
+                    .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+                    .failure { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+                    .warning { background-color: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+                    .info-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+                    .info-table th, .info-table td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+                    .info-table th { background-color: #f8f9fa; font-weight: bold; }
+                    .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; color: #666; font-size: 14px; }
+                    .button { display: inline-block; padding: 12px 24px; background-color: #007bff; color: white; text-decoration: none; border-radius: 6px; margin: 10px 5px; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h1>🚀 ModernAPI CI/CD</h1>
+                        <h2>${{ needs.analyze-workflow.outputs.workflow_name }}</h2>
+                    </div>
+                    
+                    <div class="status ${{ 
+                      needs.analyze-workflow.outputs.workflow_conclusion == 'success' && 'success' ||
+                      needs.analyze-workflow.outputs.workflow_conclusion == 'failure' && 'failure' ||
+                      'warning'
+                    }}">
+                        ${{
+                          needs.analyze-workflow.outputs.workflow_conclusion == 'success' && '✅ COMPLETED SUCCESSFULLY' ||
+                          needs.analyze-workflow.outputs.workflow_conclusion == 'failure' && '❌ FAILED' ||
+                          '⚠️ COMPLETED WITH WARNINGS'
+                        }}
+                    </div>
+                    
+                    <table class="info-table">
+                        <tr><th>Repository</th><td>${{ github.repository }}</td></tr>
+                        <tr><th>Workflow</th><td>${{ needs.analyze-workflow.outputs.workflow_name }}</td></tr>
+                        <tr><th>Branch</th><td>${{ needs.analyze-workflow.outputs.branch }}</td></tr>
+                        <tr><th>Environment</th><td>${{ needs.analyze-workflow.outputs.environment }}</td></tr>
+                        <tr><th>Status</th><td>${{ needs.analyze-workflow.outputs.workflow_conclusion }}</td></tr>
+                        <tr><th>Author</th><td>${{ github.event.workflow_run.actor.login }}</td></tr>
+                        <tr><th>Commit</th><td><code>${{ github.event.workflow_run.head_sha }}</code></td></tr>
+                        <tr><th>Triggered</th><td>${{ github.event.workflow_run.created_at }}</td></tr>
+                    </table>
+                    
+                    <div style="text-align: center;">
+                        <a href="https://github.com/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id }}" class="button">
+                            📊 View Workflow Run
+                        </a>
+                        <a href="https://github.com/${{ github.repository }}" class="button">
+                            📁 View Repository  
+                        </a>
+                    </div>
+                    
+                    ${{ 
+                      needs.analyze-workflow.outputs.notification_level == 'critical' && 
+                      '<div style="background-color: #f8d7da; color: #721c24; padding: 15px; margin: 20px 0; border-radius: 6px; border: 1px solid #f5c6cb;"><strong>⚠️ CRITICAL:</strong> This failure requires immediate attention!</div>' ||
+                      ''
+                    }}
+                    
+                    <div class="footer">
+                        <p>This notification was sent automatically by ModernAPI CI/CD system.</p>
+                        <p>To modify notification settings, update the workflow configuration.</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+            
+  # =============================================================================
+  # Custom Webhook Notifications
+  # =============================================================================
+  webhook-notification:
+    name: 🔗 Custom Webhook
+    runs-on: ubuntu-latest
+    needs: [analyze-workflow]
+    if: |
+      needs.analyze-workflow.outputs.should_notify == 'true' &&
+      secrets.CUSTOM_WEBHOOK_URL != ''
+    timeout-minutes: 5
+    
+    steps:
+      - name: 🔗 Send custom webhook notification
+        run: |
+          # Create standardized webhook payload
+          cat > webhook-payload.json << EOF
+          {
+            "event_type": "ci_cd_notification",
+            "timestamp": "$(date -u --iso-8601=seconds)",
+            "source": "github_actions",
+            "repository": "${{ github.repository }}",
+            "workflow": {
+              "name": "${{ needs.analyze-workflow.outputs.workflow_name }}",
+              "status": "${{ needs.analyze-workflow.outputs.workflow_status }}",
+              "conclusion": "${{ needs.analyze-workflow.outputs.workflow_conclusion }}",
+              "run_id": "${{ github.event.workflow_run.id }}",
+              "run_url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id }}",
+              "duration_ms": "${{ github.event.workflow_run.run_duration_ms }}"
+            },
+            "git": {
+              "branch": "${{ needs.analyze-workflow.outputs.branch }}",
+              "commit": "${{ github.event.workflow_run.head_sha }}",
+              "author": "${{ github.event.workflow_run.actor.login }}"
+            },
+            "deployment": {
+              "environment": "${{ needs.analyze-workflow.outputs.environment }}",
+              "notification_level": "${{ needs.analyze-workflow.outputs.notification_level }}"
+            },
+            "metadata": {
+              "github_run_number": "${{ github.run_number }}",
+              "created_at": "${{ github.event.workflow_run.created_at }}",
+              "updated_at": "${{ github.event.workflow_run.updated_at }}"
+            }
+          }
+          EOF
+          
+          # Send webhook
+          RESPONSE=$(curl -s -w "%{http_code}" -X POST "${{ secrets.CUSTOM_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -H "User-Agent: ModernAPI-CICD/1.0" \
+            -H "X-GitHub-Event: workflow_run" \
+            -d @webhook-payload.json)
+          
+          HTTP_CODE="${RESPONSE: -3}"
+          
+          if [[ "$HTTP_CODE" =~ ^2[0-9][0-9]$ ]]; then
+            echo "✅ Webhook notification sent successfully (HTTP $HTTP_CODE)"
+          else
+            echo "⚠️ Webhook notification failed (HTTP $HTTP_CODE)"
+            echo "Response: ${RESPONSE%???}"
+          fi
+          
+  # =============================================================================
+  # Notification Summary
+  # =============================================================================
+  notification-summary:
+    name: 📊 Notification Summary
+    runs-on: ubuntu-latest
+    needs: [analyze-workflow, slack-notification, teams-notification, discord-notification, email-notification, webhook-notification]
+    if: always()
+    
+    steps:
+      - name: 📊 Generate notification summary
+        run: |
+          echo "## 📢 Notification Summary" >> $GITHUB_STEP_SUMMARY
+          echo "**Workflow:** ${{ needs.analyze-workflow.outputs.workflow_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** ${{ needs.analyze-workflow.outputs.workflow_conclusion }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ needs.analyze-workflow.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Notification Level:** ${{ needs.analyze-workflow.outputs.notification_level }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📱 Notification Channels" >> $GITHUB_STEP_SUMMARY
+          
+          # Slack
+          if [[ "${{ secrets.SLACK_WEBHOOK_URL }}" != "" ]]; then
+            if [[ "${{ needs.slack-notification.result }}" == "success" ]]; then
+              echo "- **Slack:** ✅ Sent" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- **Slack:** ❌ Failed" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "- **Slack:** ➖ Not configured" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Teams
+          if [[ "${{ secrets.TEAMS_WEBHOOK_URL }}" != "" ]]; then
+            if [[ "${{ needs.teams-notification.result }}" == "success" ]]; then
+              echo "- **Microsoft Teams:** ✅ Sent" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- **Microsoft Teams:** ❌ Failed" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "- **Microsoft Teams:** ➖ Not configured" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Discord
+          if [[ "${{ secrets.DISCORD_WEBHOOK_URL }}" != "" ]]; then
+            if [[ "${{ needs.discord-notification.result }}" == "success" ]]; then
+              echo "- **Discord:** ✅ Sent" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- **Discord:** ❌ Failed" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "- **Discord:** ➖ Not configured" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Email
+          if [[ "${{ secrets.SMTP_SERVER }}" != "" ]]; then
+            if [[ "${{ needs.email-notification.result }}" == "success" ]]; then
+              echo "- **Email:** ✅ Sent" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- **Email:** ❌ Failed" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "- **Email:** ➖ Not configured" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Custom Webhook
+          if [[ "${{ secrets.CUSTOM_WEBHOOK_URL }}" != "" ]]; then
+            if [[ "${{ needs.webhook-notification.result }}" == "success" ]]; then
+              echo "- **Custom Webhook:** ✅ Sent" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- **Custom Webhook:** ❌ Failed" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "- **Custom Webhook:** ➖ Not configured" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔧 Configuration" >> $GITHUB_STEP_SUMMARY
+          echo "To configure notifications, add the following secrets to your repository:" >> $GITHUB_STEP_SUMMARY
+          echo "- \`SLACK_WEBHOOK_URL\` - Slack incoming webhook URL" >> $GITHUB_STEP_SUMMARY
+          echo "- \`TEAMS_WEBHOOK_URL\` - Microsoft Teams webhook URL" >> $GITHUB_STEP_SUMMARY
+          echo "- \`DISCORD_WEBHOOK_URL\` - Discord webhook URL" >> $GITHUB_STEP_SUMMARY
+          echo "- \`SMTP_SERVER\`, \`SMTP_USERNAME\`, \`SMTP_PASSWORD\`, \`NOTIFICATION_EMAIL\` - Email settings" >> $GITHUB_STEP_SUMMARY
+          echo "- \`CUSTOM_WEBHOOK_URL\` - Custom webhook endpoint" >> $GITHUB_STEP_SUMMARY

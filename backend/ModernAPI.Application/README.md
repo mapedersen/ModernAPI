@@ -87,11 +87,23 @@ public class UserService
 ```
 ModernAPI.Application/
 ├── Services/          # Application services (use case orchestrators)
+│   ├── AuthService.cs       # Authentication orchestration
+│   ├── JwtTokenService.cs   # JWT token generation/validation
+│   └── UserService.cs       # User management operations
 ├── DTOs/              # Data Transfer Objects for API communication
+│   ├── AuthDtos.cs          # Authentication DTOs
+│   └── UserDtos.cs          # User-related DTOs
 ├── Validators/        # FluentValidation validators for DTOs
 ├── Mappings/          # AutoMapper profiles for object mapping
 ├── Common/            # Shared application components
+│   ├── Settings/            # Configuration POCOs
+│   │   └── JwtSettings.cs  # JWT configuration
+│   └── Exceptions/          # Application-specific exceptions
 ├── Interfaces/        # Application service contracts
+│   ├── IAuthService.cs      # Authentication service interface
+│   ├── IJwtTokenService.cs  # JWT service interface
+│   ├── IPasswordService.cs  # Password validation abstraction
+│   └── IUserService.cs      # User service interface
 └── README.md          # This documentation
 ```
 
@@ -287,6 +299,49 @@ public async Task<Result<UserDto>> CreateUserAsync(CreateUserRequest request)
 }
 ```
 
+## Authentication Implementation
+
+### **AuthService**
+Orchestrates the complete authentication flow:
+
+```csharp
+public class AuthService : IAuthService
+{
+    // Handles login, registration, token refresh, logout
+    // Coordinates between UserManager, JwtTokenService, and repositories
+    // No direct ASP.NET Core dependencies (uses IPasswordService abstraction)
+}
+```
+
+### **JwtTokenService**
+Manages JWT token lifecycle:
+
+```csharp
+public class JwtTokenService : IJwtTokenService
+{
+    // Generates access tokens with claims
+    // Creates cryptographically secure refresh tokens
+    // Validates token parameters
+}
+```
+
+### **Authentication DTOs**
+```csharp
+// Request DTOs
+public record LoginRequest(string Email, string Password, bool RememberMe);
+public record RegisterRequest(string Email, string Password, string DisplayName);
+public record RefreshTokenRequest(string RefreshToken);
+
+// Response DTOs
+public record AuthResponse(
+    string AccessToken,
+    string RefreshToken,
+    DateTime AccessTokenExpiresAt,
+    DateTime RefreshTokenExpiresAt,
+    UserDto User
+);
+```
+
 ## Key Benefits
 
 - ✅ **Testable**: Easy to unit test with mocked dependencies
@@ -294,6 +349,7 @@ public async Task<Result<UserDto>> CreateUserAsync(CreateUserRequest request)
 - ✅ **Decoupled**: Domain and infrastructure concerns are separated
 - ✅ **Consistent**: Standardized patterns for all operations
 - ✅ **Maintainable**: Clear separation of responsibilities
+- ✅ **Secure**: Authentication logic properly abstracted from infrastructure
 
 ---
 

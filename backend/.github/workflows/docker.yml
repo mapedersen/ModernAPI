@@ -1,0 +1,479 @@
+name: 🐳 Docker Build & Registry
+
+on:
+  workflow_run:
+    workflows: ["🔄 Continuous Integration"]
+    types: [completed]
+    branches: [main, develop]
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'development'
+        type: choice
+        options:
+          - development
+          - staging
+          - production
+      force_build:
+        description: 'Force rebuild even if no changes'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  PLATFORMS: linux/amd64,linux/arm64
+
+# Concurrency: cancel previous runs on new push
+concurrency:
+  group: docker-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # =============================================================================
+  # Build Metadata & Strategy
+  # =============================================================================
+  metadata:
+    name: 📋 Build Metadata
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    outputs:
+      tags: ${{ steps.meta.outputs.tags }}
+      labels: ${{ steps.meta.outputs.labels }}
+      version: ${{ steps.version.outputs.version }}
+      environment: ${{ steps.environment.outputs.environment }}
+      should_push: ${{ steps.push_decision.outputs.should_push }}
+      
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: 🏷️ Determine version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref_type }}" == "tag" ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref_name }}" == "main" ]]; then
+            VERSION=$(git describe --tags --always --abbrev=7)
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref_name }}" == "develop" ]]; then
+            VERSION=$(git describe --tags --always --abbrev=7)-beta
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+          else
+            VERSION=$(git rev-parse --short HEAD)
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+          fi
+          echo "📦 Version: $VERSION"
+          
+      - name: 🌍 Determine environment
+        id: environment
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            ENV="${{ github.event.inputs.environment }}"
+          elif [[ "${{ github.ref_name }}" == "main" ]]; then
+            ENV="production"
+          elif [[ "${{ github.ref_name }}" == "develop" ]]; then
+            ENV="staging"
+          else
+            ENV="development"
+          fi
+          echo "environment=$ENV" >> $GITHUB_OUTPUT
+          echo "🌍 Environment: $ENV"
+          
+      - name: 📊 Push decision
+        id: push_decision
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "should_push=true" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref_name }}" == "main" || "${{ github.ref_name }}" == "develop" ]]; then
+            echo "should_push=true" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref_type }}" == "tag" ]]; then
+            echo "should_push=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_push=false" >> $GITHUB_OUTPUT
+          fi
+          
+      - name: 🏷️ Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            # Tag with version for tagged releases
+            type=ref,event=tag
+            # Tag with branch name
+            type=ref,event=branch
+            # Tag latest for main branch
+            type=raw,value=latest,enable={{is_default_branch}}
+            # Tag with environment
+            type=raw,value=${{ steps.environment.outputs.environment }}
+            # Tag with version
+            type=raw,value=${{ steps.version.outputs.version }}
+            # Tag with SHA for tracking
+            type=sha,prefix={{branch}}-
+          labels: |
+            org.opencontainers.image.title=ModernAPI
+            org.opencontainers.image.description=Modern .NET 9 Web API with Clean Architecture
+            org.opencontainers.image.vendor=ModernAPI Team
+            org.opencontainers.image.version=${{ steps.version.outputs.version }}
+            org.opencontainers.image.environment=${{ steps.environment.outputs.environment }}
+            
+  # =============================================================================
+  # Multi-Architecture Docker Build
+  # =============================================================================
+  build:
+    name: 🏗️ Build Docker Image
+    runs-on: ubuntu-latest
+    needs: [metadata]
+    timeout-minutes: 30
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        
+      - name: 🐳 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          platforms: ${{ env.PLATFORMS }}
+          
+      - name: 🔐 Login to Container Registry
+        if: needs.metadata.outputs.should_push == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: 🏗️ Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: ${{ env.PLATFORMS }}
+          push: ${{ needs.metadata.outputs.should_push == 'true' }}
+          tags: ${{ needs.metadata.outputs.tags }}
+          labels: ${{ needs.metadata.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILD_VERSION=${{ needs.metadata.outputs.version }}
+            BUILD_ENVIRONMENT=${{ needs.metadata.outputs.environment }}
+            BUILD_COMMIT=${{ github.sha }}
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+            
+      - name: 📋 Generate build summary
+        run: |
+          echo "## 🐳 Docker Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** ${{ needs.metadata.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** ${{ needs.metadata.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Platforms:** ${{ env.PLATFORMS }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Registry:** ${{ env.REGISTRY }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image:** ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Push:** ${{ needs.metadata.outputs.should_push }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🏷️ Tags Generated" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo '${{ needs.metadata.outputs.tags }}' | tr ' ' '\n' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          
+  # =============================================================================
+  # Security Scanning
+  # =============================================================================
+  security-scan:
+    name: 🔒 Security Scan
+    runs-on: ubuntu-latest
+    needs: [metadata, build]
+    if: needs.metadata.outputs.should_push == 'true'
+    timeout-minutes: 15
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        
+      - name: 🔐 Login to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: 🔒 Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.metadata.outputs.version }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+          
+      - name: 📊 Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+          
+      - name: 🔒 Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'table'
+          output: 'trivy-fs-results.txt'
+          
+      - name: 📊 Upload filesystem scan results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: trivy-filesystem-scan
+          path: trivy-fs-results.txt
+          
+      - name: 🔍 Docker Scout security scan
+        if: github.event_name != 'pull_request'
+        uses: docker/scout-action@v1
+        with:
+          command: cves
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.metadata.outputs.version }}
+          ignore-unchanged: true
+          only-severities: critical,high
+          write-comment: false
+          
+  # =============================================================================
+  # Image Testing
+  # =============================================================================
+  test-image:
+    name: 🧪 Test Docker Image
+    runs-on: ubuntu-latest
+    needs: [metadata, build]
+    if: needs.metadata.outputs.should_push == 'true'
+    timeout-minutes: 10
+    
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: modernapi_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+          
+    steps:
+      - name: 🔐 Login to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: 🐳 Pull and test Docker image
+        run: |
+          # Pull the image
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.metadata.outputs.version }}
+          
+          # Test basic image properties
+          docker inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.metadata.outputs.version }}
+          
+          # Start container for testing
+          docker run -d --name modernapi-test \
+            --network host \
+            -e ASPNETCORE_ENVIRONMENT=${{ needs.metadata.outputs.environment }} \
+            -e JWT_SECRET="ThisIsATestJWTSecretKeyForCITestingPurposes123456789!" \
+            -e POSTGRES_CONNECTION_STRING="Host=localhost;Database=modernapi_test;Username=postgres;Password=postgres" \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.metadata.outputs.version }}
+            
+          # Wait for container to start
+          echo "⏳ Waiting for container to start..."
+          for i in {1..30}; do
+            if docker logs modernapi-test 2>&1 | grep -q "Now listening on"; then
+              echo "✅ Container started successfully"
+              break
+            fi
+            echo "⏳ Waiting... ($i/30)"
+            sleep 2
+          done
+          
+          # Test health endpoint
+          echo "🔍 Testing health endpoint..."
+          for i in {1..10}; do
+            if curl -f http://localhost:8080/health; then
+              echo "✅ Health check passed"
+              break
+            fi
+            echo "⏳ Retrying health check... ($i/10)"
+            sleep 3
+          done
+          
+      - name: 🧹 Cleanup test container
+        if: always()
+        run: |
+          docker stop modernapi-test || true
+          docker rm modernapi-test || true
+          
+  # =============================================================================
+  # Multi-Registry Push (Optional)
+  # =============================================================================
+  multi-registry-push:
+    name: 🚀 Multi-Registry Push
+    runs-on: ubuntu-latest
+    needs: [metadata, build, security-scan, test-image]
+    if: |
+      needs.metadata.outputs.should_push == 'true' &&
+      (github.ref_name == 'main' || github.ref_type == 'tag') &&
+      github.event_name != 'workflow_dispatch'
+    timeout-minutes: 20
+    
+    strategy:
+      matrix:
+        registry:
+          - name: "Docker Hub"
+            url: "docker.io"
+            username: "DOCKERHUB_USERNAME" 
+            password: "DOCKERHUB_TOKEN"
+          # - name: "AWS ECR"
+          #   url: "public.ecr.aws"
+          #   username: "AWS_ACCESS_KEY_ID"
+          #   password: "AWS_SECRET_ACCESS_KEY"
+          # - name: "Azure ACR"
+          #   url: "your-registry.azurecr.io"
+          #   username: "ACR_USERNAME"
+          #   password: "ACR_PASSWORD"
+    
+    steps:
+      - name: 🔐 Login to ${{ matrix.registry.name }}
+        if: |
+          secrets[matrix.registry.username] != '' && 
+          secrets[matrix.registry.password] != ''
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ matrix.registry.url }}
+          username: ${{ secrets[matrix.registry.username] }}
+          password: ${{ secrets[matrix.registry.password] }}
+          
+      - name: 🐳 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          platforms: ${{ env.PLATFORMS }}
+          
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        
+      - name: 🏗️ Build and push to ${{ matrix.registry.name }}
+        if: |
+          secrets[matrix.registry.username] != '' && 
+          secrets[matrix.registry.password] != ''
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: ${{ env.PLATFORMS }}
+          push: true
+          tags: |
+            ${{ matrix.registry.url }}/${{ github.repository }}:latest
+            ${{ matrix.registry.url }}/${{ github.repository }}:${{ needs.metadata.outputs.version }}
+          labels: ${{ needs.metadata.outputs.labels }}
+          cache-from: type=gha
+          build-args: |
+            BUILD_VERSION=${{ needs.metadata.outputs.version }}
+            BUILD_ENVIRONMENT=${{ needs.metadata.outputs.environment }}
+            BUILD_COMMIT=${{ github.sha }}
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+            
+  # =============================================================================
+  # Cleanup Old Images
+  # =============================================================================
+  cleanup:
+    name: 🧹 Cleanup Old Images
+    runs-on: ubuntu-latest
+    needs: [metadata, build]
+    if: |
+      needs.metadata.outputs.should_push == 'true' &&
+      github.ref_name == 'develop'
+    timeout-minutes: 10
+    
+    steps:
+      - name: 🧹 Delete old development images
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const packageName = '${{ env.IMAGE_NAME }}';
+            const keepCount = 10; // Keep last 10 development images
+            
+            try {
+              const packages = await github.rest.packages.getAllPackageVersionsForPackageOwnedByOrg({
+                package_type: 'container',
+                package_name: packageName.split('/')[1],
+                org: context.repo.owner,
+                per_page: 100
+              });
+              
+              // Filter for development/staging images and sort by created date
+              const devImages = packages.data
+                .filter(pkg => 
+                  pkg.metadata?.container?.tags?.some(tag => 
+                    tag.includes('develop') || tag.includes('staging') || tag.includes('beta')
+                  )
+                )
+                .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+              
+              // Delete old images beyond keepCount
+              const imagesToDelete = devImages.slice(keepCount);
+              
+              for (const image of imagesToDelete) {
+                console.log(`🗑️ Deleting image: ${image.name} (${image.created_at})`);
+                await github.rest.packages.deletePackageVersionForOrg({
+                  package_type: 'container',
+                  package_name: packageName.split('/')[1],
+                  org: context.repo.owner,
+                  package_version_id: image.id
+                });
+              }
+              
+              console.log(`✅ Cleaned up ${imagesToDelete.length} old development images`);
+            } catch (error) {
+              console.log(`ℹ️ Cleanup not needed or failed: ${error.message}`);
+            }
+            
+  # =============================================================================
+  # Notification & Summary
+  # =============================================================================
+  notify:
+    name: 📢 Build Notification
+    runs-on: ubuntu-latest
+    needs: [metadata, build, security-scan, test-image]
+    if: always() && needs.metadata.outputs.should_push == 'true'
+    
+    steps:
+      - name: 📊 Generate final summary
+        run: |
+          echo "## 🐳 Docker Build & Registry Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY  
+          echo "- **Version:** ${{ needs.metadata.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** ${{ needs.metadata.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build:** ${{ needs.build.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Security Scan:** ${{ needs.security-scan.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image Test:** ${{ needs.test-image.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Image Details" >> $GITHUB_STEP_SUMMARY
+          echo "- **Registry:** ${{ env.REGISTRY }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Repository:** ${{ env.IMAGE_NAME }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Platforms:** ${{ env.PLATFORMS }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [[ "${{ needs.build.result }}" == "success" && "${{ needs.security-scan.result }}" == "success" && "${{ needs.test-image.result }}" == "success" ]]; then
+            echo "✅ **All checks passed! Image is ready for deployment.**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Some checks failed. Please review before deployment.**" >> $GITHUB_STEP_SUMMARY
+          fi

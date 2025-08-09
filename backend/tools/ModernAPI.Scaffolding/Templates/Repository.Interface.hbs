@@ -1,0 +1,27 @@
+using {{Namespace}}.Domain.Entities;
+
+namespace {{Namespace}}.Domain.Interfaces;
+
+/// <summary>
+/// Repository interface for {{Name}} entity - Generated on {{GeneratedAt}}
+/// </summary>
+public interface I{{Name}}Repository
+{
+    Task<{{Name}}?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<{{Name}}>> GetAllAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<{{Name}}>> GetPagedAsync(int page, int pageSize, CancellationToken cancellationToken = default);
+    Task<{{Name}}> AddAsync({{Name}} entity, CancellationToken cancellationToken = default);
+    Task<{{Name}}> UpdateAsync({{Name}} entity, CancellationToken cancellationToken = default);
+    Task DeleteAsync({{Name}} entity, CancellationToken cancellationToken = default);
+    Task<bool> ExistsAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<int> CountAsync(CancellationToken cancellationToken = default);
+
+    {{#each Properties}}
+    {{#if @first}}
+    // Query methods based on properties
+    {{/if}}
+    {{#if IsRequired}}
+    Task<IReadOnlyList<{{../Name}}>> GetBy{{Name}}Async({{Type}} {{camelCase Name}}, CancellationToken cancellationToken = default);
+    {{/if}}
+    {{/each}}
+}

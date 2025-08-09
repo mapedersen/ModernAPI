@@ -1,0 +1,684 @@
+name: 🔒 Security Scanning
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    # Run security scans daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      scan_type:
+        description: 'Type of security scan'
+        required: true
+        default: 'full'
+        type: choice
+        options:
+          - full
+          - dependencies
+          - code
+          - secrets
+          - docker
+
+env:
+  DOTNET_VERSION: '9.0.x'
+  NODE_VERSION: '18'
+
+# Concurrency: cancel previous runs on new push
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # =============================================================================
+  # Dependency Vulnerability Scanning
+  # =============================================================================
+  dependency-scan:
+    name: 🔍 Dependency Scan
+    runs-on: ubuntu-latest
+    if: |
+      github.event.inputs.scan_type == 'full' ||
+      github.event.inputs.scan_type == 'dependencies' ||
+      github.event_name != 'workflow_dispatch'
+    timeout-minutes: 15
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        
+      - name: ⚡ Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+          
+      - name: 📦 Restore dependencies
+        run: dotnet restore
+        
+      - name: 🔍 .NET dependency vulnerability scan
+        run: |
+          echo "🔍 Scanning .NET dependencies for vulnerabilities..."
+          
+          # List all packages with vulnerabilities
+          dotnet list package --vulnerable --include-transitive 2>&1 | tee dependency-scan.log
+          
+          # Check if any vulnerabilities were found
+          if grep -i "vulnerable" dependency-scan.log; then
+            echo "⚠️ Vulnerable dependencies detected!"
+            
+            # Extract vulnerability details
+            echo "📋 Vulnerability Summary:" >> security-summary.md
+            echo "## 🔍 Dependency Vulnerabilities" >> security-summary.md
+            echo '```' >> security-summary.md
+            grep -A 10 -B 2 "vulnerable" dependency-scan.log >> security-summary.md
+            echo '```' >> security-summary.md
+            
+            # Set severity based on vulnerability type
+            if grep -i "critical\|high" dependency-scan.log; then
+              echo "SEVERITY=high" >> $GITHUB_ENV
+              exit 1  # Fail on high/critical vulnerabilities
+            else
+              echo "SEVERITY=medium" >> $GITHUB_ENV
+            fi
+          else
+            echo "✅ No vulnerable dependencies found"
+            echo "SEVERITY=none" >> $GITHUB_ENV
+          fi
+          
+      - name: ⚡ Setup Node.js
+        if: always()
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          
+      - name: 🔍 NPM audit
+        if: always()
+        run: |
+          echo "🔍 Scanning npm dependencies..."
+          
+          # Run npm audit
+          npm audit --audit-level=moderate --json > npm-audit.json 2>/dev/null || true
+          
+          # Check results
+          if [[ -s npm-audit.json ]]; then
+            VULNERABILITY_COUNT=$(cat npm-audit.json | jq '.metadata.vulnerabilities.total' 2>/dev/null || echo "0")
+            
+            if [[ "$VULNERABILITY_COUNT" -gt 0 ]]; then
+              echo "⚠️ Found $VULNERABILITY_COUNT npm vulnerabilities"
+              
+              echo "## 📦 NPM Vulnerabilities" >> security-summary.md
+              echo "**Total vulnerabilities:** $VULNERABILITY_COUNT" >> security-summary.md
+              echo '```json' >> security-summary.md
+              cat npm-audit.json | jq '.vulnerabilities' | head -50 >> security-summary.md
+              echo '```' >> security-summary.md
+            else
+              echo "✅ No npm vulnerabilities found"
+            fi
+          fi
+          
+      - name: 📊 Upload dependency scan results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-scan-results
+          path: |
+            dependency-scan.log
+            npm-audit.json
+            security-summary.md
+          retention-days: 30
+          
+  # =============================================================================
+  # Code Security Analysis
+  # =============================================================================
+  code-security:
+    name: 🔍 Code Security Analysis
+    runs-on: ubuntu-latest
+    if: |
+      github.event.inputs.scan_type == 'full' ||
+      github.event.inputs.scan_type == 'code' ||
+      github.event_name != 'workflow_dispatch'
+    timeout-minutes: 20
+    
+    permissions:
+      security-events: write
+      
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for better analysis
+          
+      - name: 🔍 Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: csharp
+          queries: +security-extended,security-and-quality
+          
+      - name: ⚡ Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+          
+      - name: 🏗️ Build for CodeQL analysis
+        run: |
+          dotnet restore
+          dotnet build --no-restore --configuration Release
+          
+      - name: 🔍 Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: '/language:csharp'
+          
+      - name: 🔍 Semgrep security scan
+        uses: semgrep/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/secrets
+            p/owasp-top-ten
+            p/cwe-top-25
+            p/r2c-best-practices
+          publishToken: ${{ secrets.SEMGREP_APP_TOKEN }}
+          publishDeployment: ${{ github.event_name == 'push' }}
+          generateSarif: true
+          
+      - name: 📊 Upload Semgrep SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep.sarif
+          
+  # =============================================================================
+  # Secret Scanning
+  # =============================================================================
+  secret-scan:
+    name: 🔐 Secret Scanning
+    runs-on: ubuntu-latest
+    if: |
+      github.event.inputs.scan_type == 'full' ||
+      github.event.inputs.scan_type == 'secrets' ||
+      github.event_name != 'workflow_dispatch'
+    timeout-minutes: 10
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: 🔐 TruffleHog secret scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          path: .
+          extra_args: --debug --only-verified
+          
+      - name: 🔐 GitLeaks secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+          
+      - name: 🔍 Manual secret pattern check
+        run: |
+          echo "🔍 Checking for common secret patterns..."
+          
+          # Create patterns file
+          cat > secret-patterns.txt << 'EOF'
+          password\s*=\s*['""][^'""]{8,}['""]
+          api[_-]?key\s*[=:]\s*['""][^'""]+['""]
+          secret[_-]?key\s*[=:]\s*['""][^'""]+['""]
+          private[_-]?key\s*[=:]\s*['""][^'""]+['""]
+          token\s*[=:]\s*['""][^'""]+['""]
+          connectionstring\s*[=:]\s*['""][^'""]+['""]
+          aws[_-]?access[_-]?key
+          aws[_-]?secret[_-]?key
+          github[_-]?token
+          EOF
+          
+          # Search for patterns (excluding test files and this workflow)
+          FOUND_SECRETS=false
+          while IFS= read -r pattern; do
+            if grep -r -i -n --exclude-dir=.git --exclude="*.yml" --exclude="*test*" "$pattern" . 2>/dev/null; then
+              FOUND_SECRETS=true
+              echo "⚠️ Potential secret found: $pattern"
+            fi
+          done < secret-patterns.txt
+          
+          if [[ "$FOUND_SECRETS" == "true" ]]; then
+            echo "❌ Potential secrets detected in code"
+            exit 1
+          else
+            echo "✅ No obvious secret patterns found"
+          fi
+          
+  # =============================================================================
+  # Docker Security Scanning
+  # =============================================================================
+  docker-security:
+    name: 🐳 Docker Security
+    runs-on: ubuntu-latest
+    if: |
+      github.event.inputs.scan_type == 'full' ||
+      github.event.inputs.scan_type == 'docker' ||
+      github.event_name != 'workflow_dispatch'
+    timeout-minutes: 15
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        
+      - name: 🐳 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        
+      - name: 🏗️ Build Docker image for scanning
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          tags: modernapi:security-scan
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          
+      - name: 🔍 Run Trivy container scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'modernapi:security-scan'
+          format: 'sarif'
+          output: 'trivy-container-results.sarif'
+          
+      - name: 📊 Upload Trivy container scan results
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-container-results.sarif'
+          
+      - name: 🔍 Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-fs-results.sarif'
+          
+      - name: 📊 Upload Trivy filesystem scan results
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-fs-results.sarif'
+          
+      - name: 🔍 Dockerfile best practices check
+        run: |
+          echo "🔍 Checking Dockerfile best practices..."
+          
+          # Install hadolint
+          wget -O hadolint https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-x86_64
+          chmod +x hadolint
+          
+          # Run hadolint on Dockerfile
+          ./hadolint Dockerfile --format json > dockerfile-scan.json || true
+          
+          # Check results
+          if [[ -s dockerfile-scan.json ]]; then
+            ERROR_COUNT=$(cat dockerfile-scan.json | jq 'length' 2>/dev/null || echo "0")
+            if [[ "$ERROR_COUNT" -gt 0 ]]; then
+              echo "⚠️ Found $ERROR_COUNT Dockerfile issues"
+              echo "## 🐳 Dockerfile Issues" >> docker-security-summary.md
+              echo '```json' >> docker-security-summary.md
+              cat dockerfile-scan.json >> docker-security-summary.md
+              echo '```' >> docker-security-summary.md
+            fi
+          fi
+          
+      - name: 🔍 Docker Scout vulnerability scan
+        if: github.event_name != 'pull_request'
+        uses: docker/scout-action@v1
+        with:
+          command: cves
+          image: modernapi:security-scan
+          sarif-file: scout-results.sarif
+          
+      - name: 📊 Upload Docker Scout results
+        if: always() && github.event_name != 'pull_request'
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: scout-results.sarif
+          
+      - name: 📊 Upload Docker security scan results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-security-results
+          path: |
+            trivy-container-results.sarif
+            trivy-fs-results.sarif
+            dockerfile-scan.json
+            docker-security-summary.md
+            scout-results.sarif
+          retention-days: 30
+          
+  # =============================================================================
+  # Infrastructure Security
+  # =============================================================================
+  infrastructure-security:
+    name: 🏗️ Infrastructure Security
+    runs-on: ubuntu-latest
+    if: |
+      github.event.inputs.scan_type == 'full' ||
+      github.event_name == 'schedule' ||
+      github.event_name == 'push'
+    timeout-minutes: 10
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        
+      - name: 🔍 Kubernetes security scan
+        if: hashFiles('k8s/**/*.yml') != ''
+        run: |
+          echo "🔍 Scanning Kubernetes manifests..."
+          
+          # Install kube-score
+          wget -O kube-score https://github.com/zegl/kube-score/releases/latest/download/kube-score_linux_amd64
+          chmod +x kube-score
+          
+          # Scan Kubernetes manifests
+          if [[ -d "k8s" ]]; then
+            ./kube-score score k8s/*.yml --output-format json > k8s-security-scan.json 2>/dev/null || true
+            
+            if [[ -s k8s-security-scan.json ]]; then
+              echo "📊 Kubernetes security analysis completed"
+              cat k8s-security-scan.json | jq '.[] | select(.grade < 7)' > k8s-issues.json
+              
+              if [[ -s k8s-issues.json ]]; then
+                echo "⚠️ Kubernetes security issues found"
+                echo "## ☸️ Kubernetes Security Issues" >> infra-security-summary.md
+                echo '```json' >> infra-security-summary.md
+                cat k8s-issues.json >> infra-security-summary.md
+                echo '```' >> infra-security-summary.md
+              fi
+            fi
+          fi
+          
+      - name: 🔍 Docker Compose security check
+        if: hashFiles('docker-compose*.yml') != ''
+        run: |
+          echo "🔍 Checking Docker Compose security..."
+          
+          # Check for common security issues in docker-compose files
+          find . -name "docker-compose*.yml" | while read -r file; do
+            echo "Checking $file..."
+            
+            # Check for privileged containers
+            if grep -q "privileged.*true" "$file"; then
+              echo "⚠️ Privileged container found in $file"
+            fi
+            
+            # Check for host network mode
+            if grep -q "network_mode.*host" "$file"; then
+              echo "⚠️ Host network mode found in $file"
+            fi
+            
+            # Check for volume mounts to sensitive directories
+            if grep -q "/var/run/docker.sock" "$file"; then
+              echo "⚠️ Docker socket mount found in $file"
+            fi
+            
+            # Check for default passwords
+            if grep -i -E "(password|secret).*=.*(password|secret|admin|root)" "$file"; then
+              echo "⚠️ Potential default password found in $file"
+            fi
+          done
+          
+      - name: 🔍 GitHub Actions security check
+        run: |
+          echo "🔍 Checking GitHub Actions security..."
+          
+          # Check workflow files for security issues
+          find .github/workflows -name "*.yml" | while read -r workflow; do
+            echo "Checking workflow: $workflow"
+            
+            # Check for dangerous permissions
+            if grep -q "permissions:.*write-all" "$workflow"; then
+              echo "⚠️ Overly broad permissions in $workflow"
+            fi
+            
+            # Check for hardcoded secrets
+            if grep -i -E "(api[_-]?key|secret|token|password).*[=:].*(sk-|ghp_|gho_)" "$workflow"; then
+              echo "⚠️ Potential hardcoded secret in $workflow"
+            fi
+            
+            # Check for external action versions
+            grep -E "uses:.*@(?!v[0-9])" "$workflow" | while read -r line; do
+              echo "ℹ️ Unversioned action found: $line"
+            done
+          done
+          
+      - name: 📊 Upload infrastructure security results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: infrastructure-security-results
+          path: |
+            k8s-security-scan.json
+            k8s-issues.json
+            infra-security-summary.md
+          retention-days: 30
+          
+  # =============================================================================
+  # Security Summary & Reporting
+  # =============================================================================
+  security-summary:
+    name: 📊 Security Summary
+    runs-on: ubuntu-latest
+    needs: [dependency-scan, code-security, secret-scan, docker-security, infrastructure-security]
+    if: always()
+    
+    steps:
+      - name: 📥 Download all security artifacts
+        if: always()
+        uses: actions/download-artifact@v4
+        with:
+          path: security-results
+          
+      - name: 📊 Generate security summary
+        if: always()
+        run: |
+          echo "📊 Generating comprehensive security summary..."
+          
+          cat > security-report.md << 'EOF'
+          # 🔒 Security Scan Report
+          
+          **Scan Date:** $(date -u)
+          **Repository:** ${{ github.repository }}
+          **Branch:** ${{ github.ref_name }}
+          **Commit:** ${{ github.sha }}
+          
+          ## 📋 Scan Results Overview
+          
+          | Component | Status | Issues |
+          |-----------|--------|---------|
+          EOF
+          
+          # Dependency scan results
+          if [[ -f "security-results/dependency-scan-results/dependency-scan.log" ]]; then
+            if grep -q "vulnerable" security-results/dependency-scan-results/dependency-scan.log; then
+              echo "| Dependencies | ❌ Issues Found | [Details](#dependencies) |" >> security-report.md
+            else
+              echo "| Dependencies | ✅ Clean | None |" >> security-report.md
+            fi
+          else
+            echo "| Dependencies | ⏭️ Skipped | N/A |" >> security-report.md
+          fi
+          
+          # Code security results
+          if [[ -d "security-results/code-security-results" ]]; then
+            echo "| Code Analysis | ✅ Completed | [Details](#code-analysis) |" >> security-report.md
+          else
+            echo "| Code Analysis | ⏭️ Skipped | N/A |" >> security-report.md
+          fi
+          
+          # Secret scan results
+          NEEDS_SECRET_CHECK="${{ needs.secret-scan.result }}"
+          if [[ "$NEEDS_SECRET_CHECK" == "success" ]]; then
+            echo "| Secret Scan | ✅ Clean | None |" >> security-report.md
+          elif [[ "$NEEDS_SECRET_CHECK" == "failure" ]]; then
+            echo "| Secret Scan | ❌ Issues Found | [Details](#secrets) |" >> security-report.md
+          else
+            echo "| Secret Scan | ⏭️ Skipped | N/A |" >> security-report.md
+          fi
+          
+          # Docker security results
+          if [[ -d "security-results/docker-security-results" ]]; then
+            echo "| Docker Security | ✅ Completed | [Details](#docker) |" >> security-report.md
+          else
+            echo "| Docker Security | ⏭️ Skipped | N/A |" >> security-report.md
+          fi
+          
+          # Infrastructure security results
+          if [[ -d "security-results/infrastructure-security-results" ]]; then
+            echo "| Infrastructure | ✅ Completed | [Details](#infrastructure) |" >> security-report.md
+          else
+            echo "| Infrastructure | ⏭️ Skipped | N/A |" >> security-report.md
+          fi
+          
+          # Add detailed sections
+          echo "" >> security-report.md
+          echo "## 📖 Detailed Results" >> security-report.md
+          
+          # Include dependency details if available
+          if [[ -f "security-results/dependency-scan-results/security-summary.md" ]]; then
+            echo "" >> security-report.md
+            echo "### Dependencies" >> security-report.md
+            cat security-results/dependency-scan-results/security-summary.md >> security-report.md
+          fi
+          
+          # Include Docker details if available
+          if [[ -f "security-results/docker-security-results/docker-security-summary.md" ]]; then
+            echo "" >> security-report.md
+            echo "### Docker" >> security-report.md
+            cat security-results/docker-security-results/docker-security-summary.md >> security-report.md
+          fi
+          
+          # Include infrastructure details if available
+          if [[ -f "security-results/infrastructure-security-results/infra-security-summary.md" ]]; then
+            echo "" >> security-report.md
+            echo "### Infrastructure" >> security-report.md
+            cat security-results/infrastructure-security-results/infra-security-summary.md >> security-report.md
+          fi
+          
+          # Add recommendations
+          echo "" >> security-report.md
+          echo "## 🚀 Recommendations" >> security-report.md
+          echo "1. Review and address any high/critical vulnerabilities immediately" >> security-report.md
+          echo "2. Update dependencies to latest secure versions" >> security-report.md
+          echo "3. Implement security headers and best practices" >> security-report.md
+          echo "4. Regular security scans in CI/CD pipeline" >> security-report.md
+          echo "5. Security awareness training for development team" >> security-report.md
+          
+          echo "✅ Security report generated"
+          
+      - name: 📊 Create security summary for GitHub
+        if: always()
+        run: |
+          echo "## 🔒 Security Scan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "**Scan completed at:** $(date -u)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Overall status
+          OVERALL_STATUS="✅ Passed"
+          
+          if [[ "${{ needs.dependency-scan.result }}" == "failure" || 
+                "${{ needs.secret-scan.result }}" == "failure" ]]; then
+            OVERALL_STATUS="❌ Issues Found"
+          fi
+          
+          echo "**Overall Status:** $OVERALL_STATUS" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Scan Results" >> $GITHUB_STEP_SUMMARY
+          echo "- **Dependencies:** ${{ needs.dependency-scan.result || 'skipped' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Code Security:** ${{ needs.code-security.result || 'skipped' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Secret Scan:** ${{ needs.secret-scan.result || 'skipped' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Docker Security:** ${{ needs.docker-security.result || 'skipped' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Infrastructure:** ${{ needs.infrastructure-security.result || 'skipped' }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ "$OVERALL_STATUS" == "❌ Issues Found" ]]; then
+            echo "⚠️ **Action Required:** Please review and address security issues before deployment." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "🎉 **All security scans passed!** Ready for deployment." >> $GITHUB_STEP_SUMMARY
+          fi
+          
+      - name: 📊 Upload comprehensive security report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: comprehensive-security-report
+          path: |
+            security-report.md
+            security-results/
+          retention-days: 90
+          
+      # Optional: Create GitHub issue for security findings
+      - name: 🚨 Create security issue
+        if: |
+          always() &&
+          (needs.dependency-scan.result == 'failure' || needs.secret-scan.result == 'failure') &&
+          github.event_name == 'schedule'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const title = `🔒 Security Issues Detected - ${new Date().toISOString().split('T')[0]}`;
+            const body = `
+            # 🔒 Automated Security Scan Results
+            
+            **Scan Date:** ${new Date().toISOString()}
+            **Repository:** ${{ github.repository }}
+            **Branch:** ${{ github.ref_name }}
+            
+            ## ⚠️ Issues Detected
+            
+            The automated security scan has detected potential security issues that require attention:
+            
+            - **Dependencies:** ${{ needs.dependency-scan.result }}
+            - **Secret Scan:** ${{ needs.secret-scan.result }}
+            - **Code Security:** ${{ needs.code-security.result }}
+            
+            ## 🔗 Detailed Reports
+            
+            Download the comprehensive security report from the [workflow run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}).
+            
+            ## 🚀 Action Items
+            
+            1. Review all high and critical severity findings
+            2. Update vulnerable dependencies
+            3. Address any secrets found in code
+            4. Implement recommended security fixes
+            5. Re-run security scans to verify fixes
+            
+            ## 📋 Checklist
+            
+            - [ ] Review dependency vulnerabilities
+            - [ ] Address secret scanning findings
+            - [ ] Update vulnerable packages
+            - [ ] Test security fixes
+            - [ ] Re-run security scans
+            - [ ] Close this issue when all critical issues are resolved
+            
+            ---
+            
+            *This issue was automatically created by the security scanning workflow.*
+            `;
+            
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: title,
+              body: body,
+              labels: ['security', 'bug', 'priority-high']
+            });

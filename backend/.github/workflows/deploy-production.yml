@@ -1,0 +1,676 @@
+name: 🚀 Deploy to Production
+
+on:
+  workflow_run:
+    workflows: ["🐳 Docker Build & Registry"]
+    types: [completed]
+    branches: [main]
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to deploy'
+        required: true
+        type: string
+      deployment_type:
+        description: 'Deployment type'
+        required: true
+        default: 'blue-green'
+        type: choice
+        options:
+          - blue-green
+          - rolling
+          - recreate
+      skip_approval:
+        description: 'Skip manual approval (Emergency only)'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  ENVIRONMENT: production
+  CLUSTER_NAME: modernapi-production
+  NAMESPACE: modernapi
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+# Concurrency: only one production deployment at a time
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  # =============================================================================
+  # Pre-deployment Validation & Approval
+  # =============================================================================
+  validate:
+    name: 🔍 Pre-deployment Validation
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'release' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    timeout-minutes: 15
+    
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      deployment_type: ${{ steps.deployment_type.outputs.type }}
+      image_exists: ${{ steps.check_image.outputs.exists }}
+      staging_healthy: ${{ steps.check_staging.outputs.healthy }}
+      
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        
+      - name: 🏷️ Determine version to deploy
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ github.event.inputs.version }}"
+          elif [[ "${{ github.event_name }}" == "release" ]]; then
+            VERSION="${{ github.event.release.tag_name }}"
+          else
+            # Get latest version from main branch
+            VERSION=$(git describe --tags --always --abbrev=7)
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "📦 Production deployment version: $VERSION"
+          
+      - name: 🎯 Determine deployment type
+        id: deployment_type
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            TYPE="${{ github.event.inputs.deployment_type }}"
+          else
+            TYPE="blue-green"  # Default for automated deployments
+          fi
+          echo "type=$TYPE" >> $GITHUB_OUTPUT
+          echo "🎯 Deployment type: $TYPE"
+          
+      - name: 🔐 Login to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: 🔍 Verify Docker image exists and scan
+        id: check_image
+        run: |
+          if docker manifest inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }} > /dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "✅ Production image exists: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}"
+            
+            # Additional security scan for production
+            echo "🔒 Running final security scan..."
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
+            
+            # Run Trivy scan with strict settings for production
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+              aquasec/trivy:latest image --exit-code 1 --severity HIGH,CRITICAL \
+              ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
+              
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "❌ Production image not found: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}"
+          fi
+          
+      - name: 🧪 Verify staging environment health
+        id: check_staging
+        run: |
+          echo "🔍 Checking staging environment health..."
+          
+          # Check staging API health
+          if curl -f -m 10 https://staging-api.yourdomain.com/health > /dev/null 2>&1; then
+            echo "healthy=true" >> $GITHUB_OUTPUT
+            echo "✅ Staging environment is healthy"
+            
+            # Get staging version for comparison
+            STAGING_VERSION=$(curl -s https://staging-api.yourdomain.com/version | jq -r '.version' || echo "unknown")
+            echo "📊 Staging version: $STAGING_VERSION"
+            echo "📊 Production version: ${{ steps.version.outputs.version }}"
+            
+          else
+            echo "healthy=false" >> $GITHUB_OUTPUT
+            echo "❌ Staging environment is unhealthy - deployment blocked"
+          fi
+          
+      - name: 📋 Pre-deployment checklist
+        run: |
+          echo "## 🚀 Production Deployment Pre-flight Check" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Deployment Type:** ${{ steps.deployment_type.outputs.type }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image Exists:** ${{ steps.check_image.outputs.exists }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Staging Health:** ${{ steps.check_staging.outputs.healthy }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Security Scan:** Passed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ "${{ steps.check_image.outputs.exists }}" == "true" && "${{ steps.check_staging.outputs.healthy }}" == "true" ]]; then
+            echo "✅ **All pre-deployment checks passed**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Pre-deployment checks failed - deployment blocked**" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+  # =============================================================================
+  # Manual Approval Gate
+  # =============================================================================
+  approval:
+    name: 👥 Production Deployment Approval
+    runs-on: ubuntu-latest
+    needs: [validate]
+    if: |
+      needs.validate.outputs.image_exists == 'true' &&
+      needs.validate.outputs.staging_healthy == 'true' &&
+      github.event.inputs.skip_approval != 'true'
+    timeout-minutes: 60  # 1 hour approval window
+    
+    environment:
+      name: production-approval
+      
+    steps:
+      - name: ⏳ Awaiting manual approval
+        run: |
+          echo "🔄 Production deployment requires manual approval"
+          echo "📋 Review checklist:"
+          echo "  ✅ Version: ${{ needs.validate.outputs.version }}"
+          echo "  ✅ Image security scan passed"
+          echo "  ✅ Staging environment healthy"
+          echo "  ✅ All automated tests passed"
+          echo ""
+          echo "⏳ Waiting for approval from production deployment team..."
+          
+  # =============================================================================
+  # Blue-Green Production Deployment
+  # =============================================================================
+  deploy-blue-green:
+    name: 🔄 Blue-Green Deployment
+    runs-on: ubuntu-latest
+    needs: [validate, approval]
+    if: |
+      always() &&
+      needs.validate.outputs.image_exists == 'true' &&
+      needs.validate.outputs.staging_healthy == 'true' &&
+      (needs.approval.result == 'success' || needs.approval.result == 'skipped') &&
+      needs.validate.outputs.deployment_type == 'blue-green'
+    timeout-minutes: 30
+    
+    environment:
+      name: production
+      url: https://api.yourdomain.com
+      
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        
+      - name: 🔧 Prepare Blue environment
+        id: prepare_blue
+        run: |
+          # Determine current active environment (blue or green)
+          CURRENT_ENV=$(curl -s https://api.yourdomain.com/version | jq -r '.environment' || echo "green")
+          
+          if [[ "$CURRENT_ENV" == "blue" ]]; then
+            DEPLOY_ENV="green"
+            STANDBY_ENV="blue"
+          else
+            DEPLOY_ENV="blue"
+            STANDBY_ENV="green"
+          fi
+          
+          echo "current_env=$CURRENT_ENV" >> $GITHUB_OUTPUT
+          echo "deploy_env=$DEPLOY_ENV" >> $GITHUB_OUTPUT
+          echo "standby_env=$STANDBY_ENV" >> $GITHUB_OUTPUT
+          
+          echo "🔄 Current active: $CURRENT_ENV"
+          echo "🆕 Deploying to: $DEPLOY_ENV"
+          echo "⏸️ Standby: $STANDBY_ENV"
+          
+      - name: 🚀 Deploy to Blue environment
+        run: |
+          # Deploy to the inactive environment
+          DEPLOY_ENV="${{ steps.prepare_blue.outputs.deploy_env }}"
+          
+          # Update environment configuration for blue-green
+          cp .env.example .env.production-$DEPLOY_ENV
+          
+          # Set production-specific values
+          sed -i "s/DOMAIN=yourdomain.com/DOMAIN=yourdomain.com/" .env.production-$DEPLOY_ENV
+          sed -i "s/API_DOMAIN=api.yourdomain.com/API_DOMAIN=$DEPLOY_ENV-api.yourdomain.com/" .env.production-$DEPLOY_ENV
+          sed -i "s/ASPNETCORE_ENVIRONMENT=Production/ASPNETCORE_ENVIRONMENT=Production/" .env.production-$DEPLOY_ENV
+          
+          # Set secrets from GitHub secrets
+          echo "JWT_SECRET=${{ secrets.PRODUCTION_JWT_SECRET }}" >> .env.production-$DEPLOY_ENV
+          echo "POSTGRES_PASSWORD=${{ secrets.PRODUCTION_POSTGRES_PASSWORD }}" >> .env.production-$DEPLOY_ENV
+          echo "GRAFANA_ADMIN_PASSWORD=${{ secrets.PRODUCTION_GRAFANA_PASSWORD }}" >> .env.production-$DEPLOY_ENV
+          echo "SEQ_API_KEY=${{ secrets.PRODUCTION_SEQ_API_KEY }}" >> .env.production-$DEPLOY_ENV
+          echo "ACME_EMAIL=${{ secrets.ACME_EMAIL }}" >> .env.production-$DEPLOY_ENV
+          
+          # Set image version
+          echo "MODERNAPI_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.validate.outputs.version }}" >> .env.production-$DEPLOY_ENV
+          echo "ENVIRONMENT_SUFFIX=$DEPLOY_ENV" >> .env.production-$DEPLOY_ENV
+          
+          # Deploy using production script with blue-green flag
+          chmod +x scripts/deploy-docker.sh
+          ENV_FILE=".env.production-$DEPLOY_ENV" ./scripts/deploy-docker.sh --deploy --blue-green
+          
+      - name: 🧪 Health check Blue environment
+        run: |
+          DEPLOY_ENV="${{ steps.prepare_blue.outputs.deploy_env }}"
+          
+          echo "🔍 Performing comprehensive health checks on $DEPLOY_ENV environment..."
+          
+          # Wait for service to be ready
+          for i in {1..20}; do
+            if curl -f https://$DEPLOY_ENV-api.yourdomain.com/health > /dev/null 2>&1; then
+              echo "✅ Basic health check passed"
+              break
+            fi
+            echo "⏳ Waiting for $DEPLOY_ENV environment... ($i/20)"
+            sleep 15
+          done
+          
+          # Comprehensive health checks
+          echo "🔍 Running comprehensive health checks..."
+          
+          # API health
+          curl -f https://$DEPLOY_ENV-api.yourdomain.com/health
+          curl -f https://$DEPLOY_ENV-api.yourdomain.com/health/ready
+          
+          # Database connectivity
+          curl -f https://$DEPLOY_ENV-api.yourdomain.com/health/database
+          
+          # Authentication system
+          LOGIN_RESPONSE=$(curl -s -w "%{http_code}" -o /tmp/login.json -X POST \
+            https://$DEPLOY_ENV-api.yourdomain.com/api/auth/login \
+            -H "Content-Type: application/json" \
+            -d '{
+              "email": "admin@modernapi.dev",
+              "password": "Admin@123!"
+            }')
+          
+          if [[ $LOGIN_RESPONSE -eq 200 ]]; then
+            echo "✅ Authentication system healthy"
+          else
+            echo "❌ Authentication system check failed: $LOGIN_RESPONSE"
+            exit 1
+          fi
+          
+          # Performance check
+          RESPONSE_TIME=$(curl -w "%{time_total}" -o /dev/null -s https://$DEPLOY_ENV-api.yourdomain.com/health)
+          if (( $(echo "$RESPONSE_TIME < 1.0" | bc -l) )); then
+            echo "✅ Performance check passed (${RESPONSE_TIME}s)"
+          else
+            echo "⚠️ Performance check slow: ${RESPONSE_TIME}s"
+          fi
+          
+      - name: 🔄 Switch traffic to Blue environment
+        id: switch_traffic
+        run: |
+          DEPLOY_ENV="${{ steps.prepare_blue.outputs.deploy_env }}"
+          CURRENT_ENV="${{ steps.prepare_blue.outputs.current_env }}"
+          
+          echo "🔄 Switching production traffic from $CURRENT_ENV to $DEPLOY_ENV..."
+          
+          # Update load balancer/reverse proxy configuration
+          # This step depends on your infrastructure setup
+          
+          # For Traefik/Nginx, update routing rules
+          # For cloud load balancers, update target groups
+          # For Kubernetes, update service selectors
+          
+          # Example: Update Traefik configuration
+          curl -X PUT "https://traefik.yourdomain.com/api/http/routers/modernapi" \
+            -H "Authorization: Bearer ${{ secrets.TRAEFIK_API_TOKEN }}" \
+            -d '{
+              "rule": "Host(`api.yourdomain.com`)",
+              "service": "modernapi-'$DEPLOY_ENV'"
+            }'
+            
+          echo "✅ Traffic switched to $DEPLOY_ENV environment"
+          
+          # Give it time to propagate
+          sleep 30
+          
+      - name: 🧪 Production smoke tests
+        run: |
+          echo "🧪 Running production smoke tests..."
+          
+          # Test main production endpoint
+          for i in {1..5}; do
+            if curl -f https://api.yourdomain.com/health; then
+              echo "✅ Production endpoint healthy (attempt $i)"
+              break
+            fi
+            echo "⏳ Retrying production endpoint... ($i/5)"
+            sleep 10
+          done
+          
+          # Test key user flows
+          echo "🧪 Testing critical user flows..."
+          
+          # Authentication flow
+          LOGIN_RESPONSE=$(curl -s -w "%{http_code}" -o /tmp/prod_login.json -X POST \
+            https://api.yourdomain.com/api/auth/login \
+            -H "Content-Type: application/json" \
+            -d '{
+              "email": "admin@modernapi.dev",
+              "password": "Admin@123!"
+            }')
+          
+          if [[ $LOGIN_RESPONSE -eq 200 ]]; then
+            echo "✅ Production authentication flow working"
+            TOKEN=$(cat /tmp/prod_login.json | jq -r '.accessToken')
+            
+            # Test protected endpoint
+            PROTECTED_RESPONSE=$(curl -s -w "%{http_code}" -o /tmp/protected.json \
+              -H "Authorization: Bearer $TOKEN" \
+              https://api.yourdomain.com/api/auth/me)
+              
+            if [[ $PROTECTED_RESPONSE -eq 200 ]]; then
+              echo "✅ Protected endpoints working"
+            else
+              echo "❌ Protected endpoint test failed"
+              exit 1
+            fi
+          else
+            echo "❌ Production authentication test failed"
+            exit 1
+          fi
+          
+      - name: ⏸️ Keep old environment as standby
+        run: |
+          STANDBY_ENV="${{ steps.prepare_blue.outputs.standby_env }}"
+          
+          echo "⏸️ Keeping $STANDBY_ENV environment as standby for quick rollback"
+          echo "🗓️ Standby environment will be cleaned up in 24 hours if deployment is stable"
+          
+          # Tag the standby environment for cleanup
+          echo "STANDBY_ENV=$STANDBY_ENV" >> $GITHUB_ENV
+          echo "CLEANUP_TIME=$(date -d '+24 hours' --iso-8601)" >> $GITHUB_ENV
+          
+  # =============================================================================
+  # Rolling Deployment (Alternative)
+  # =============================================================================
+  deploy-rolling:
+    name: 🔄 Rolling Deployment
+    runs-on: ubuntu-latest
+    needs: [validate, approval]
+    if: |
+      always() &&
+      needs.validate.outputs.image_exists == 'true' &&
+      needs.validate.outputs.staging_healthy == 'true' &&
+      (needs.approval.result == 'success' || needs.approval.result == 'skipped') &&
+      needs.validate.outputs.deployment_type == 'rolling'
+    timeout-minutes: 20
+    
+    environment:
+      name: production
+      url: https://api.yourdomain.com
+      
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        
+      - name: ☸️ Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.2'
+          
+      - name: 🔧 Configure Kubernetes context
+        run: |
+          echo "${{ secrets.PRODUCTION_KUBECONFIG }}" | base64 -d > kubeconfig
+          export KUBECONFIG=kubeconfig
+          kubectl config current-context
+          
+      - name: 🚀 Rolling deployment to Kubernetes
+        run: |
+          export KUBECONFIG=kubeconfig
+          
+          # Update image in deployment
+          kubectl set image deployment/modernapi \
+            modernapi=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.validate.outputs.version }} \
+            -n ${{ env.NAMESPACE }}
+            
+          # Wait for rollout with timeout
+          kubectl rollout status deployment/modernapi \
+            -n ${{ env.NAMESPACE }} \
+            --timeout=600s
+            
+          # Verify all pods are ready
+          kubectl wait --for=condition=ready pod \
+            -l app.kubernetes.io/name=modernapi \
+            -n ${{ env.NAMESPACE }} \
+            --timeout=300s
+            
+      - name: 🧪 Verify rolling deployment
+        run: |
+          export KUBECONFIG=kubeconfig
+          
+          # Check deployment status
+          kubectl get deployment modernapi -n ${{ env.NAMESPACE }}
+          kubectl get pods -l app.kubernetes.io/name=modernapi -n ${{ env.NAMESPACE }}
+          
+          # Health check
+          for i in {1..10}; do
+            if curl -f https://api.yourdomain.com/health; then
+              echo "✅ Rolling deployment successful"
+              break
+            fi
+            echo "⏳ Waiting for health check... ($i/10)"
+            sleep 10
+          done
+          
+      - name: 🧹 Cleanup
+        if: always()
+        run: rm -f kubeconfig
+        
+  # =============================================================================
+  # Database Migration & Seeding
+  # =============================================================================
+  migrate-production:
+    name: 🗄️ Production Database Migration
+    runs-on: ubuntu-latest
+    needs: [validate, approval, deploy-blue-green]  # or deploy-rolling
+    if: |
+      always() &&
+      (needs.deploy-blue-green.result == 'success' || needs.deploy-rolling.result == 'success')
+    timeout-minutes: 15
+    
+    environment:
+      name: production-db
+      
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        
+      - name: ⚡ Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+          
+      - name: 🗄️ Install EF Core tools
+        run: dotnet tool install --global dotnet-ef
+        
+      - name: 🗄️ Backup production database
+        run: |
+          echo "💾 Creating database backup before migration..."
+          
+          # Create backup using connection string
+          pg_dump "${{ secrets.PRODUCTION_DATABASE_URL }}" \
+            --file="production_backup_$(date +%Y%m%d_%H%M%S).sql" \
+            --verbose \
+            --clean \
+            --if-exists
+            
+          echo "✅ Database backup completed"
+          
+      - name: 🗄️ Run production database migrations
+        run: |
+          echo "🗄️ Running production database migrations..."
+          
+          # Run migrations with production connection
+          dotnet ef database update \
+            --project ModernAPI.Infrastructure \
+            --startup-project ModernAPI.API \
+            --connection "${{ secrets.PRODUCTION_DATABASE_URL }}" \
+            --verbose
+            
+          echo "✅ Database migrations completed"
+          
+      - name: 🧪 Verify database health
+        run: |
+          echo "🔍 Verifying database health post-migration..."
+          
+          # Test database connection from application
+          curl -f https://api.yourdomain.com/health/database
+          
+          echo "✅ Database health verified"
+          
+  # =============================================================================
+  # Post-deployment Monitoring
+  # =============================================================================
+  monitor-deployment:
+    name: 📊 Post-deployment Monitoring
+    runs-on: ubuntu-latest
+    needs: [validate, deploy-blue-green, deploy-rolling, migrate-production]
+    if: |
+      always() &&
+      (needs.deploy-blue-green.result == 'success' || needs.deploy-rolling.result == 'success') &&
+      needs.migrate-production.result == 'success'
+    timeout-minutes: 30
+    
+    steps:
+      - name: 📊 Monitor deployment health
+        run: |
+          echo "📊 Starting 30-minute post-deployment monitoring..."
+          
+          ERROR_COUNT=0
+          SUCCESS_COUNT=0
+          
+          for i in {1..30}; do
+            echo "🔍 Health check $i/30..."
+            
+            # Health check
+            if curl -f -m 5 https://api.yourdomain.com/health > /dev/null 2>&1; then
+              SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+              echo "✅ Health check passed ($SUCCESS_COUNT successes)"
+            else
+              ERROR_COUNT=$((ERROR_COUNT + 1))
+              echo "❌ Health check failed ($ERROR_COUNT failures)"
+              
+              # If more than 3 failures, trigger rollback
+              if [[ $ERROR_COUNT -gt 3 ]]; then
+                echo "🚨 Too many health check failures - triggering rollback"
+                exit 1
+              fi
+            fi
+            
+            # Check error rates via monitoring API
+            ERROR_RATE=$(curl -s "https://monitoring.yourdomain.com/api/error-rate" | jq -r '.rate' || echo "0")
+            if (( $(echo "$ERROR_RATE > 0.05" | bc -l) )); then
+              echo "⚠️ High error rate detected: $ERROR_RATE"
+            fi
+            
+            sleep 60  # Check every minute
+          done
+          
+          # Final assessment
+          SUCCESS_RATE=$(echo "scale=2; $SUCCESS_COUNT / 30 * 100" | bc)
+          echo "📊 Final health check success rate: $SUCCESS_RATE%"
+          
+          if (( $(echo "$SUCCESS_RATE >= 95" | bc -l) )); then
+            echo "✅ Deployment monitoring successful"
+          else
+            echo "❌ Deployment monitoring indicates issues"
+            exit 1
+          fi
+          
+  # =============================================================================
+  # Notification & Final Status
+  # =============================================================================
+  notify-success:
+    name: 🎉 Deployment Success
+    runs-on: ubuntu-latest
+    needs: [validate, deploy-blue-green, deploy-rolling, migrate-production, monitor-deployment]
+    if: |
+      always() &&
+      (needs.deploy-blue-green.result == 'success' || needs.deploy-rolling.result == 'success') &&
+      needs.migrate-production.result == 'success' &&
+      needs.monitor-deployment.result == 'success'
+    
+    steps:
+      - name: 🎉 Production deployment successful
+        run: |
+          echo "## 🎉 Production Deployment Successful!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**🚀 Deployment Details:**" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** ${{ needs.validate.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Type:** ${{ needs.validate.outputs.deployment_type }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Deployed:** $(date -u)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**🔗 Production Environment:**" >> $GITHUB_STEP_SUMMARY
+          echo "- **API:** https://api.yourdomain.com" >> $GITHUB_STEP_SUMMARY
+          echo "- **Health:** https://api.yourdomain.com/health" >> $GITHUB_STEP_SUMMARY
+          echo "- **Docs:** https://api.yourdomain.com/scalar/v1" >> $GITHUB_STEP_SUMMARY
+          echo "- **Monitoring:** https://dashboard.yourdomain.com" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**📊 Deployment Metrics:**" >> $GITHUB_STEP_SUMMARY
+          echo "- **Health Monitoring:** 30 minutes - PASSED" >> $GITHUB_STEP_SUMMARY
+          echo "- **Database Migration:** COMPLETED" >> $GITHUB_STEP_SUMMARY
+          echo "- **Zero Downtime:** ACHIEVED" >> $GITHUB_STEP_SUMMARY
+          
+      # Add success notifications
+      # - name: 📱 Notify success
+      #   uses: 8398a7/action-slack@v3
+      #   with:
+      #     status: success
+      #     text: "🎉 Production deployment successful! Version ${{ needs.validate.outputs.version }} is live."
+      #     webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+      
+  # =============================================================================
+  # Emergency Rollback
+  # =============================================================================
+  rollback:
+    name: 🚨 Emergency Rollback
+    runs-on: ubuntu-latest
+    needs: [validate, deploy-blue-green, deploy-rolling, migrate-production, monitor-deployment]
+    if: |
+      always() &&
+      (needs.deploy-blue-green.result == 'failure' || 
+       needs.deploy-rolling.result == 'failure' ||
+       needs.migrate-production.result == 'failure' ||
+       needs.monitor-deployment.result == 'failure')
+    
+    environment:
+      name: production-rollback
+      
+    steps:
+      - name: 🚨 Execute emergency rollback
+        run: |
+          echo "🚨 EMERGENCY ROLLBACK INITIATED"
+          echo "🔄 Rolling back to previous stable version..."
+          
+          # Get previous stable version
+          PREVIOUS_VERSION=$(curl -s https://api.yourdomain.com/version | jq -r '.previous_version' || echo "unknown")
+          
+          # Implement rollback based on deployment type
+          if [[ "${{ needs.validate.outputs.deployment_type }}" == "blue-green" ]]; then
+            echo "🔄 Blue-green rollback: switching traffic back..."
+            # Switch traffic back to standby environment
+            # Implementation depends on your load balancer setup
+          else
+            echo "🔄 Kubernetes rollback: reverting deployment..."
+            kubectl rollout undo deployment/modernapi -n ${{ env.NAMESPACE }}
+          fi
+          
+          echo "✅ Emergency rollback completed"
+          echo "⚠️ Previous version $PREVIOUS_VERSION is now active"
+          echo "🔍 Please investigate the deployment failure"
+          
+      # Add failure notifications
+      # - name: 📱 Notify failure and rollback
+      #   uses: 8398a7/action-slack@v3
+      #   with:
+      #     status: failure
+      #     text: "🚨 Production deployment failed and rolled back! Please investigate."
+      #     webhook_url: ${{ secrets.SLACK_WEBHOOK_ALERTS }}

@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Xunit;
+using Microsoft.AspNetCore.JsonPatch;
 using ModernAPI.Application.Common.Exceptions;
 using ModernAPI.Application.DTOs;
 using ModernAPI.Application.Services;
@@ -228,6 +229,181 @@ public class UserServiceTests : ApplicationTestBase
         result.Should().NotBeNull();
         result.Success.Should().BeTrue();
         result.Message.Should().Be("User reactivated successfully");
+        
+        VerifyUserWasUpdated();
+        VerifyUnitOfWorkSaveChangesWasCalled();
+    }
+
+    [Fact]
+    public async Task PatchUserProfileAsync_WithValidPatchDocument_ShouldUpdateUser()
+    {
+        // Arrange
+        var user = CreateValidUser();
+        var patchDocument = new JsonPatchDocument<PatchUserProfileRequest>();
+        patchDocument.Replace(x => x.DisplayName, "Updated Display Name");
+        patchDocument.Replace(x => x.FirstName, "Updated First");
+        
+        SetupUserRepositoryGetById(user);
+
+        // Act
+        var result = await _userService.PatchUserProfileAsync(user.Id, patchDocument);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.User.DisplayName.Should().Be("Updated Display Name");
+        result.User.FirstName.Should().Be("Updated First");
+        result.User.LastName.Should().Be(user.LastName); // Unchanged
+        result.Message.Should().Be("Profile updated successfully");
+        
+        VerifyUserWasUpdated();
+        VerifyUnitOfWorkSaveChangesWasCalled();
+    }
+
+    [Fact]
+    public async Task PatchUserProfileAsync_WithInvalidOperation_ShouldThrowValidationException()
+    {
+        // Arrange
+        var user = CreateValidUser();
+        var patchDocument = new JsonPatchDocument<PatchUserProfileRequest>();
+        patchDocument.Operations.Add(new Microsoft.AspNetCore.JsonPatch.Operations.Operation<PatchUserProfileRequest>("replace", "/invalidpath", null, "some value")); // Invalid path
+        
+        SetupUserRepositoryGetById(user);
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<ValidationException>(() => 
+            _userService.PatchUserProfileAsync(user.Id, patchDocument));
+        
+        exception.Message.Should().Contain("Path '/invalidpath' is not allowed for patching");
+    }
+
+    [Fact]
+    public async Task PatchUserProfileAsync_WithForbiddenOperation_ShouldThrowValidationException()
+    {
+        // Arrange
+        var user = CreateValidUser();
+        var patchDocument = new JsonPatchDocument<PatchUserProfileRequest>();
+        patchDocument.Operations.Add(new Microsoft.AspNetCore.JsonPatch.Operations.Operation<PatchUserProfileRequest>("test", "/displayName", null, "test")); // Test operation not allowed
+        
+        SetupUserRepositoryGetById(user);
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<ValidationException>(() => 
+            _userService.PatchUserProfileAsync(user.Id, patchDocument));
+        
+        exception.Message.Should().Contain("Operation 'test' is not allowed");
+    }
+
+    [Fact]
+    public async Task PatchUserProfileAsync_WithNullDisplayName_ShouldThrowValidationException()
+    {
+        // Arrange
+        var user = CreateValidUser();
+        var patchDocument = new JsonPatchDocument<PatchUserProfileRequest>();
+        patchDocument.Replace(x => x.DisplayName, null); // Null display name not allowed
+        
+        SetupUserRepositoryGetById(user);
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<ValidationException>(() => 
+            _userService.PatchUserProfileAsync(user.Id, patchDocument));
+        
+        exception.Message.Should().Contain("DisplayName cannot be null");
+    }
+
+    [Fact]
+    public async Task PatchUserProfileAsync_WithRemoveDisplayName_ShouldThrowValidationException()
+    {
+        // Arrange
+        var user = CreateValidUser();
+        var patchDocument = new JsonPatchDocument<PatchUserProfileRequest>();
+        patchDocument.Remove(x => x.DisplayName); // Removing display name not allowed
+        
+        SetupUserRepositoryGetById(user);
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<ValidationException>(() => 
+            _userService.PatchUserProfileAsync(user.Id, patchDocument));
+        
+        exception.Message.Should().Contain("DisplayName cannot be removed");
+    }
+
+    [Fact]
+    public async Task PatchUserProfileAsync_WithInvalidResultingData_ShouldThrowValidationException()
+    {
+        // Arrange
+        var user = CreateValidUser();
+        var patchDocument = new JsonPatchDocument<PatchUserProfileRequest>();
+        patchDocument.Replace(x => x.DisplayName, ""); // Empty display name is invalid
+        
+        SetupUserRepositoryGetById(user);
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<ValidationException>(() => 
+            _userService.PatchUserProfileAsync(user.Id, patchDocument));
+        
+        exception.Message.Should().Contain("The patch operations resulted in invalid user data");
+    }
+
+    [Fact]
+    public async Task PatchUserProfileAsync_WithNonExistentUser_ShouldThrowNotFoundException()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var patchDocument = new JsonPatchDocument<PatchUserProfileRequest>();
+        patchDocument.Replace(x => x.DisplayName, "Updated Name");
+        
+        SetupUserRepositoryGetByIdReturnsNull(userId);
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<NotFoundException>(() => 
+            _userService.PatchUserProfileAsync(userId, patchDocument));
+        
+        exception.Message.Should().Contain("User");
+        exception.Message.Should().Contain(userId.ToString());
+    }
+
+    [Fact]
+    public async Task PatchUserProfileAsync_WithRemoveFirstName_ShouldSetFirstNameToNull()
+    {
+        // Arrange
+        var user = CreateValidUser();
+        var patchDocument = new JsonPatchDocument<PatchUserProfileRequest>();
+        patchDocument.Remove(x => x.FirstName); // Removing first name is allowed
+        
+        SetupUserRepositoryGetById(user);
+
+        // Act
+        var result = await _userService.PatchUserProfileAsync(user.Id, patchDocument);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.User.FirstName.Should().BeNull();
+        result.User.DisplayName.Should().Be(user.DisplayName); // Unchanged
+        result.User.LastName.Should().Be(user.LastName); // Unchanged
+        
+        VerifyUserWasUpdated();
+        VerifyUnitOfWorkSaveChangesWasCalled();
+    }
+
+    [Fact]
+    public async Task PatchUserProfileAsync_WithAddLastName_ShouldAddLastName()
+    {
+        // Arrange
+        var user = CreateValidUser();
+        user.UpdateNames(user.FirstName, null); // Start with null last name
+        var patchDocument = new JsonPatchDocument<PatchUserProfileRequest>();
+        patchDocument.Add(x => x.LastName, "New Last Name");
+        
+        SetupUserRepositoryGetById(user);
+
+        // Act
+        var result = await _userService.PatchUserProfileAsync(user.Id, patchDocument);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.User.LastName.Should().Be("New Last Name");
+        result.User.DisplayName.Should().Be(user.DisplayName); // Unchanged
+        result.User.FirstName.Should().Be(user.FirstName); // Unchanged
         
         VerifyUserWasUpdated();
         VerifyUnitOfWorkSaveChangesWasCalled();

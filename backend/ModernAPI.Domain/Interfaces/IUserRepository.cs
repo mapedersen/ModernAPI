@@ -110,6 +110,11 @@ public interface IUnitOfWork : IDisposable
     /// </summary>
     IUserRepository Users { get; }
 
+    /// <summary>
+    /// Repository for RefreshToken entities.
+    /// </summary>
+    IRefreshTokenRepository RefreshTokens { get; }
+
     // Additional repositories would be added here as the domain grows
     // IProductRepository Products { get; }
     // IOrderRepository Orders { get; }

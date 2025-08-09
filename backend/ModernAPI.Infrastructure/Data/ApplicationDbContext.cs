@@ -21,6 +21,11 @@ public class ApplicationDbContext : IdentityDbContext<User, Microsoft.AspNetCore
     {
     }
 
+    /// <summary>
+    /// Refresh tokens table.
+    /// </summary>
+    public DbSet<RefreshToken> RefreshTokens { get; set; } = null!;
+
 
     /// <summary>
     /// Configures entity models and relationships.

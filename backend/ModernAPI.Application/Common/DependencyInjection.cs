@@ -26,6 +26,12 @@ public static class DependencyInjection
 
         // Register application services
         services.AddScoped<IUserService, UserService>();
+        services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IJwtTokenService, JwtTokenService>();
+        
+        // Register caching services
+        services.AddScoped<IETagService, ETagService>();
+        services.AddScoped<IHttpCachingService, HttpCachingService>();
 
         // Add other application services here as they are created
         // services.AddScoped<IProductService, ProductService>();
