@@ -91,7 +91,7 @@ public abstract class IntegrationTestBase : IAsyncDisposable, IDisposable
         // Ensure database is created and migrations are applied
         Task.Run(async () =>
         {
-            await DbContext.Database.EnsureCreatedAsync();
+            await DbContext.Database.MigrateAsync(); // Apply all migrations
             await InitializeRespawner();
         }).Wait();
     }

@@ -84,7 +84,7 @@ public class ExceptionMiddlewareTests
     }
 
     [Fact]
-    public async Task InvokeAsync_WithValidationException_ShouldReturn400WithValidationDetails()
+    public async Task InvokeAsync_WithValidationException_ShouldReturn422WithValidationDetails()
     {
         // Arrange
         var context = CreateHttpContext();
@@ -103,13 +103,13 @@ public class ExceptionMiddlewareTests
         await middleware.InvokeAsync(context);
 
         // Assert
-        context.Response.StatusCode.Should().Be((int)HttpStatusCode.BadRequest);
+        context.Response.StatusCode.Should().Be((int)HttpStatusCode.UnprocessableEntity); // 422 per RFC 4918
         
         var responseBody = await GetResponseBody(context);
         var problemDetails = JsonSerializer.Deserialize<JsonElement>(responseBody);
         
         problemDetails.GetProperty("title").GetString().Should().Be("One or more validation errors occurred");
-        problemDetails.GetProperty("status").GetInt32().Should().Be(400);
+        problemDetails.GetProperty("status").GetInt32().Should().Be(422); // UnprocessableEntity
         
         // ValidationProblemDetails uses "errors" property for field-specific errors
         if (problemDetails.TryGetProperty("errors", out var errors))
@@ -164,7 +164,7 @@ public class ExceptionMiddlewareTests
         var problemDetails = JsonSerializer.Deserialize<JsonElement>(responseBody);
         
         problemDetails.GetProperty("title").GetString().Should().Be("Unauthorized");
-        problemDetails.GetProperty("detail").GetString().Should().Be("You are not authorized to access this resource");
+        problemDetails.GetProperty("detail").GetString().Should().Be("Authentication is required to access this resource");
     }
 
     [Fact]

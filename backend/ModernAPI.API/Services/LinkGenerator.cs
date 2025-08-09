@@ -62,12 +62,18 @@ public class LinkGeneratorService : ILinkGenerator
     private readonly LinkGenerator _linkGenerator;
     private readonly IHttpContextAccessor _httpContextAccessor;
 
+    /// <summary>
+    /// Initializes a new instance of the LinkGeneratorService.
+    /// </summary>
+    /// <param name="linkGenerator">ASP.NET Core link generator for URL generation</param>
+    /// <param name="httpContextAccessor">HTTP context accessor for current request context</param>
     public LinkGeneratorService(LinkGenerator linkGenerator, IHttpContextAccessor httpContextAccessor)
     {
         _linkGenerator = linkGenerator ?? throw new ArgumentNullException(nameof(linkGenerator));
         _httpContextAccessor = httpContextAccessor ?? throw new ArgumentNullException(nameof(httpContextAccessor));
     }
 
+    /// <inheritdoc />
     public LinkDto GenerateLink(string action, string controller, object? values = null, 
         string rel = "self", string method = "GET", string? title = null)
     {
@@ -92,6 +98,7 @@ public class LinkGeneratorService : ILinkGenerator
         };
     }
 
+    /// <inheritdoc />
     public Dictionary<string, LinkDto> GenerateUserLinks(Guid userId, string? currentUserId = null, bool isAdmin = false)
     {
         var links = new Dictionary<string, LinkDto>
@@ -120,6 +127,7 @@ public class LinkGeneratorService : ILinkGenerator
         return links;
     }
 
+    /// <inheritdoc />
     public Dictionary<string, LinkDto> GeneratePaginationLinks(string controller, string action, 
         int currentPage, int totalPages, int pageSize, object? additionalRouteValues = null)
     {
@@ -161,6 +169,7 @@ public class LinkGeneratorService : ILinkGenerator
         return links;
     }
 
+    /// <inheritdoc />
     public Dictionary<string, LinkDto> GenerateAuthLinks(bool isAuthenticated = false)
     {
         var links = new Dictionary<string, LinkDto>();

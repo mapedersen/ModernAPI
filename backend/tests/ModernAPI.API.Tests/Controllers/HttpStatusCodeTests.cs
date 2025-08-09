@@ -16,6 +16,7 @@ using Moq;
 using System.Net;
 using System.Security.Claims;
 using System.Text.Json;
+using System.Diagnostics.Metrics;
 using Xunit;
 
 namespace ModernAPI.API.Tests.Controllers;
@@ -34,6 +35,7 @@ public class HttpStatusCodeTests : ApiTestBase
     private readonly Mock<IHttpCachingService> _mockCachingService;
     private readonly Mock<IETagService> _mockETagService;
     private readonly Mock<IAuthService> _mockAuthService;
+    private readonly Meter _testMeter;
 
     public HttpStatusCodeTests()
     {
@@ -51,10 +53,16 @@ public class HttpStatusCodeTests : ApiTestBase
             _mockCachingService.Object,
             _mockETagService.Object);
 
+        // Create AuthenticationMetrics with mock IMeterFactory
+        var mockMeterFactory = new Mock<IMeterFactory>();
+        _testMeter = new Meter("TestMeter");
+        mockMeterFactory.Setup(f => f.Create(It.IsAny<MeterOptions>()))
+            .Returns(_testMeter);
+        
         _authController = new AuthController(
             _mockAuthService.Object,
             _mockAuthLogger.Object,
-            new Mock<AuthenticationMetrics>().Object);
+            new AuthenticationMetrics(mockMeterFactory.Object));
 
         // Set up HTTP context for controllers
         SetupControllerContext(_usersController);
@@ -248,8 +256,18 @@ public class HttpStatusCodeTests : ApiTestBase
         MockUserService.Setup(x => x.UpdateUserProfileAsync(userId, request, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new PreconditionFailedException("User", "ETag mismatch - resource has been modified"));
 
+        // Setup authentication context
+        var claims = new List<Claim>
+        {
+            new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
+            new Claim(ClaimTypes.Email, "test@example.com")
+        };
+        var identity = new ClaimsIdentity(claims, "Test");
+        var principal = new ClaimsPrincipal(identity);
+        
         // Setup conditional update validation to return precondition failed
         var httpContext = new DefaultHttpContext();
+        httpContext.User = principal;
         httpContext.Request.Headers["If-Match"] = "\"outdated-etag\"";
         _usersController.ControllerContext = new ControllerContext
         {
@@ -429,7 +447,7 @@ public class HttpStatusCodeTests : ApiTestBase
     {
         // Arrange
         var exception = new NotFoundException("User", "123");
-        var middleware = CreateExceptionMiddleware();
+        var middleware = CreateExceptionMiddleware(exception);
         var context = CreateHttpContext();
 
         // Act
@@ -463,7 +481,7 @@ public class HttpStatusCodeTests : ApiTestBase
             ["Password"] = ["Password is too short"]
         };
         var exception = new ValidationException(validationErrors);
-        var middleware = CreateExceptionMiddleware();
+        var middleware = CreateExceptionMiddleware(exception);
         var context = CreateHttpContext();
 
         // Act
@@ -479,7 +497,7 @@ public class HttpStatusCodeTests : ApiTestBase
     {
         // Arrange
         var exception = new ConflictException("User", "test@example.com");
-        var middleware = CreateExceptionMiddleware();
+        var middleware = CreateExceptionMiddleware(exception);
         var context = CreateHttpContext();
 
         // Act
@@ -495,7 +513,7 @@ public class HttpStatusCodeTests : ApiTestBase
     {
         // Arrange
         var exception = new PreconditionFailedException("User", "Resource has been modified");
-        var middleware = CreateExceptionMiddleware();
+        var middleware = CreateExceptionMiddleware(exception);
         var context = CreateHttpContext();
 
         // Act
@@ -511,7 +529,7 @@ public class HttpStatusCodeTests : ApiTestBase
     {
         // Arrange
         var exception = new UnauthorizedAccessException("Authentication required");
-        var middleware = CreateExceptionMiddleware();
+        var middleware = CreateExceptionMiddleware(exception);
         var context = CreateHttpContext();
 
         // Act
@@ -584,9 +602,14 @@ public class HttpStatusCodeTests : ApiTestBase
         return new OperationResult(true, "Operation completed successfully");
     }
 
-    private ExceptionMiddleware CreateExceptionMiddleware()
+    private ExceptionMiddleware CreateExceptionMiddleware(Exception? exceptionToThrow = null)
     {
-        var requestDelegate = new RequestDelegate(_ => throw new NotImplementedException());
+        var requestDelegate = new RequestDelegate(_ => 
+        {
+            if (exceptionToThrow != null)
+                throw exceptionToThrow;
+            throw new NotImplementedException();
+        });
         var logger = new Mock<ILogger<ExceptionMiddleware>>().Object;
         var environment = new Mock<IWebHostEnvironment>().Object;
         
@@ -598,6 +621,7 @@ public class HttpStatusCodeTests : ApiTestBase
         var context = new DefaultHttpContext();
         context.Request.Path = "/api/v1/test";
         context.Request.Method = "GET";
+        context.Response.Body = new MemoryStream();
         return context;
     }
 
@@ -609,6 +633,12 @@ public class HttpStatusCodeTests : ApiTestBase
     }
 
     #endregion
+
+    public override void Dispose()
+    {
+        _testMeter?.Dispose();
+        base.Dispose();
+    }
 }
 
 /// <summary>

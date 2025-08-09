@@ -11,13 +11,26 @@ public class HttpRequestHeadersAdapter : IHttpRequestHeaders
 {
     private readonly IHeaderDictionary _headers;
 
+    /// <summary>
+    /// Initializes a new instance of the HttpRequestHeadersAdapter.
+    /// </summary>
+    /// <param name="headers">The HTTP request headers dictionary</param>
     public HttpRequestHeadersAdapter(IHeaderDictionary headers)
     {
         _headers = headers ?? throw new ArgumentNullException(nameof(headers));
     }
 
+    /// <summary>
+    /// Gets the If-None-Match header values for conditional requests.
+    /// </summary>
     public IEnumerable<string> IfNoneMatch => GetHeaderValues("If-None-Match");
+    /// <summary>
+    /// Gets the If-Modified-Since header values for conditional requests.
+    /// </summary>
     public IEnumerable<string> IfModifiedSince => GetHeaderValues("If-Modified-Since");
+    /// <summary>
+    /// Gets the If-Match header values for conditional requests.
+    /// </summary>
     public IEnumerable<string> IfMatch => GetHeaderValues("If-Match");
 
     private IEnumerable<string> GetHeaderValues(string headerName)
@@ -37,41 +50,63 @@ public class HttpResponseHeadersAdapter : IHttpResponseHeaders
 {
     private readonly IHeaderDictionary _headers;
 
+    /// <summary>
+    /// Initializes a new instance of the HttpResponseHeadersAdapter.
+    /// </summary>
+    /// <param name="headers">The HTTP response headers dictionary</param>
     public HttpResponseHeadersAdapter(IHeaderDictionary headers)
     {
         _headers = headers ?? throw new ArgumentNullException(nameof(headers));
     }
 
+    /// <summary>
+    /// Gets or sets the Cache-Control header value.
+    /// </summary>
     public string? CacheControl
     {
         get => GetHeaderValue("Cache-Control");
         set => SetHeaderValue("Cache-Control", value);
     }
 
+    /// <summary>
+    /// Gets or sets the Pragma header value.
+    /// </summary>
     public string? Pragma
     {
         get => GetHeaderValue("Pragma");
         set => SetHeaderValue("Pragma", value);
     }
 
+    /// <summary>
+    /// Gets or sets the Expires header value.
+    /// </summary>
     public string? Expires
     {
         get => GetHeaderValue("Expires");
         set => SetHeaderValue("Expires", value);
     }
 
+    /// <summary>
+    /// Gets or sets the Vary header value.
+    /// </summary>
     public string? Vary
     {
         get => GetHeaderValue("Vary");
         set => SetHeaderValue("Vary", value);
     }
 
+    /// <summary>
+    /// Gets or sets the ETag header value.
+    /// </summary>
     public string? ETag
     {
         get => GetHeaderValue("ETag");
         set => SetHeaderValue("ETag", value);
     }
 
+    /// <summary>
+    /// Gets or sets the Last-Modified header value.
+    /// </summary>
     public string? LastModified
     {
         get => GetHeaderValue("Last-Modified");

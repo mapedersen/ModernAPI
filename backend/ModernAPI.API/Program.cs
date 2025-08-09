@@ -515,4 +515,8 @@ static async Task SeedDataAsync(IServiceProvider serviceProvider)
 }
 
 // Make Program class accessible to integration tests
+/// <summary>
+/// The main Program class for the ModernAPI application.
+/// This class is made public and partial to support integration testing.
+/// </summary>
 public partial class Program { }

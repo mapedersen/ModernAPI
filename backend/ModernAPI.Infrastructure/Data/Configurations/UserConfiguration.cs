@@ -87,7 +87,7 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         // Configure Identity properties with snake_case column names
         builder.Property(u => u.Email)
             .HasColumnName("email")
-            .HasMaxLength(254); // RFC 5321 email length limit
+            .HasMaxLength(320); // RFC 5321 email length limit
 
         builder.Property(u => u.UserName)
             .HasColumnName("user_name")
@@ -99,7 +99,7 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
 
         builder.Property(u => u.NormalizedEmail)
             .HasColumnName("normalized_email")
-            .HasMaxLength(254);
+            .HasMaxLength(320);
 
         builder.Property(u => u.EmailConfirmed)
             .HasColumnName("email_confirmed");

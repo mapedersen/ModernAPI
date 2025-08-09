@@ -19,12 +19,22 @@ public class RequestLoggingMiddleware
         "X-Api-Key"
     };
 
+    /// <summary>
+    /// Initializes a new instance of the RequestLoggingMiddleware.
+    /// </summary>
+    /// <param name="next">The next middleware in the request pipeline</param>
+    /// <param name="logger">Logger for request logging operations</param>
     public RequestLoggingMiddleware(RequestDelegate next, ILogger<RequestLoggingMiddleware> logger)
     {
         _next = next ?? throw new ArgumentNullException(nameof(next));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
+    /// <summary>
+    /// Invokes the middleware to log the HTTP request and response.
+    /// </summary>
+    /// <param name="context">The HTTP context for the current request</param>
+    /// <returns>A task that represents the asynchronous middleware operation</returns>
     public async Task InvokeAsync(HttpContext context)
     {
         // Skip logging for health checks and metrics endpoints

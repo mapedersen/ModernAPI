@@ -13,6 +13,12 @@ public abstract class InfrastructureTestBase : IAsyncDisposable, IDisposable
 {
     protected readonly ApplicationDbContext DbContext;
     protected readonly Faker Faker = new();
+    
+    /// <summary>
+    /// Indicates whether the database provider supports transactions.
+    /// In-memory database provider does not support transactions.
+    /// </summary>
+    protected bool IsUsingInMemoryDatabase => DbContext.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory";
 
     protected InfrastructureTestBase()
     {

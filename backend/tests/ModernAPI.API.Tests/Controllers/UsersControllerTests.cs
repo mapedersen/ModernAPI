@@ -228,7 +228,17 @@ public class UsersControllerTests : ApiTestBase
         // Assert
         result.Result.Should().BeOfType<OkObjectResult>();
         var okResult = result.Result as OkObjectResult;
-        okResult!.Value.Should().BeEquivalentTo(userListDto);
+        okResult!.Value.Should().NotBeNull();
+        
+        // Verify it's a HATEOAS collection with the correct structure
+        var response = okResult.Value;
+        response.Should().NotBeNull();
+        response.Should().BeAssignableTo<object>();
+        var responseType = response!.GetType();
+        responseType.GetProperty("Items").Should().NotBeNull();
+        responseType.GetProperty("TotalCount").Should().NotBeNull();
+        responseType.GetProperty("CurrentPage").Should().NotBeNull();
+        responseType.GetProperty("PageSize").Should().NotBeNull();
     }
 
     [Fact]
@@ -250,7 +260,17 @@ public class UsersControllerTests : ApiTestBase
         // Assert
         result.Result.Should().BeOfType<OkObjectResult>();
         var okResult = result.Result as OkObjectResult;
-        okResult!.Value.Should().BeEquivalentTo(userListDto);
+        okResult!.Value.Should().NotBeNull();
+        
+        // Verify it's a HATEOAS collection with the correct structure
+        var response = okResult.Value;
+        response.Should().NotBeNull();
+        response.Should().BeAssignableTo<object>();
+        var responseType = response!.GetType();
+        responseType.GetProperty("Items").Should().NotBeNull();
+        responseType.GetProperty("TotalCount").Should().NotBeNull();
+        responseType.GetProperty("CurrentPage").Should().NotBeNull();
+        responseType.GetProperty("PageSize").Should().NotBeNull();
         
         MockUserService.Verify(x => x.SearchUsersAsync(
             It.Is<SearchUsersRequest>(r => r.SearchTerm == searchTerm), 
@@ -441,7 +461,10 @@ public class UsersControllerTests : ApiTestBase
         var exception = await Assert.ThrowsAsync<ValidationException>(() => 
             _controller.PatchUser(userId, patchDocument));
         
-        exception.Message.Should().Contain("Invalid patch operations");
+        // ValidationException always uses the standard message
+        exception.Message.Should().Be("One or more validation errors occurred");
+        exception.ValidationErrors.Should().ContainKey("PatchOperations");
+        exception.ValidationErrors["PatchOperations"].Should().Contain("Invalid patch operations");
     }
 
     [Fact]

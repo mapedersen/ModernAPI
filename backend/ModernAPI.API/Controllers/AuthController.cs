@@ -18,6 +18,12 @@ public class AuthController : BaseController
     private readonly ILogger<AuthController> _logger;
     private readonly AuthenticationMetrics _metrics;
 
+    /// <summary>
+    /// Initializes a new instance of the AuthController.
+    /// </summary>
+    /// <param name="authService">Service for authentication operations</param>
+    /// <param name="logger">Logger for authentication operations</param>
+    /// <param name="metrics">Metrics collector for authentication events</param>
     public AuthController(IAuthService authService, ILogger<AuthController> logger, AuthenticationMetrics metrics)
     {
         _authService = authService ?? throw new ArgumentNullException(nameof(authService));

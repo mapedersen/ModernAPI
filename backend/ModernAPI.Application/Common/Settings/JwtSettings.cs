@@ -5,6 +5,9 @@ namespace ModernAPI.Application.Common.Settings;
 /// </summary>
 public class JwtSettings
 {
+    /// <summary>
+    /// Configuration section name for JWT settings in appsettings.json.
+    /// </summary>
     public const string SectionName = "JwtSettings";
 
     /// <summary>

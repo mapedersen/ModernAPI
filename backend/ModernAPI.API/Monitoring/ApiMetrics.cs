@@ -14,6 +14,10 @@ public class ApiMetrics
     private readonly Counter<int> _databaseQueries;
     private readonly Histogram<double> _databaseQueryDuration;
 
+    /// <summary>
+    /// Initializes a new instance of the ApiMetrics class.
+    /// </summary>
+    /// <param name="meterFactory">Factory for creating meters</param>
     public ApiMetrics(IMeterFactory meterFactory)
     {
         var meter = meterFactory.Create("ModernAPI.Api", "1.0");
@@ -51,6 +55,13 @@ public class ApiMetrics
             description: "Duration of database queries in milliseconds");
     }
 
+    /// <summary>
+    /// Records metrics for an HTTP request.
+    /// </summary>
+    /// <param name="method">The HTTP method (GET, POST, etc.)</param>
+    /// <param name="endpoint">The endpoint being accessed</param>
+    /// <param name="statusCode">The HTTP status code returned</param>
+    /// <param name="durationMs">The request duration in milliseconds</param>
     public void RecordHttpRequest(string method, string endpoint, int statusCode, double durationMs)
     {
         var tags = new[]
@@ -70,11 +81,22 @@ public class ApiMetrics
         }
     }
 
+    /// <summary>
+    /// Records the change in active connections.
+    /// </summary>
+    /// <param name="delta">The change in active connections (positive for new connections, negative for closed connections)</param>
     public void RecordActiveConnection(int delta)
     {
         _activeConnections.Add(delta);
     }
 
+    /// <summary>
+    /// Records metrics for a database query.
+    /// </summary>
+    /// <param name="operation">The type of database operation (SELECT, INSERT, etc.)</param>
+    /// <param name="table">The database table involved in the operation</param>
+    /// <param name="durationMs">The query duration in milliseconds</param>
+    /// <param name="success">Whether the query was successful</param>
     public void RecordDatabaseQuery(string operation, string table, double durationMs, bool success = true)
     {
         var tags = new[]

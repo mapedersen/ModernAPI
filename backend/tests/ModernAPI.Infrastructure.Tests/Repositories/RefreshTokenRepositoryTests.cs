@@ -137,7 +137,7 @@ public class RefreshTokenRepositoryTests : InfrastructureTestBase
         var activeToken = await AddRefreshTokenToDatabase(CreateValidRefreshToken(user, DateTime.UtcNow.AddDays(1)));
         
         // Create expired token
-        var expiredToken = CreateValidRefreshToken(user, DateTime.UtcNow.AddDays(-1));
+        var expiredToken = CreateExpiredRefreshToken(user, DateTime.UtcNow.AddDays(-1));
         await AddRefreshTokenToDatabase(expiredToken);
         
         // Create revoked token
@@ -162,7 +162,7 @@ public class RefreshTokenRepositoryTests : InfrastructureTestBase
         var user = await AddUserToDatabase(CreateValidUser());
         
         // Create only expired/revoked tokens
-        var expiredToken = CreateValidRefreshToken(user, DateTime.UtcNow.AddDays(-1));
+        var expiredToken = CreateExpiredRefreshToken(user, DateTime.UtcNow.AddDays(-1));
         await AddRefreshTokenToDatabase(expiredToken);
 
         // Act
@@ -209,8 +209,8 @@ public class RefreshTokenRepositoryTests : InfrastructureTestBase
         var user = await AddUserToDatabase(CreateValidUser());
         
         // Create expired tokens
-        var expiredToken1 = CreateValidRefreshToken(user, DateTime.UtcNow.AddDays(-1));
-        var expiredToken2 = CreateValidRefreshToken(user, DateTime.UtcNow.AddHours(-1));
+        var expiredToken1 = CreateExpiredRefreshToken(user, DateTime.UtcNow.AddDays(-1));
+        var expiredToken2 = CreateExpiredRefreshToken(user, DateTime.UtcNow.AddHours(-1));
         await AddRefreshTokenToDatabase(expiredToken1);
         await AddRefreshTokenToDatabase(expiredToken2);
         
@@ -287,7 +287,7 @@ public class RefreshTokenRepositoryTests : InfrastructureTestBase
         var user = await AddUserToDatabase(CreateValidUser());
         
         // Create only expired/revoked tokens
-        var expiredToken = CreateValidRefreshToken(user, DateTime.UtcNow.AddDays(-1));
+        var expiredToken = CreateExpiredRefreshToken(user, DateTime.UtcNow.AddDays(-1));
         await AddRefreshTokenToDatabase(expiredToken);
 
         // Act
@@ -306,6 +306,33 @@ public class RefreshTokenRepositoryTests : InfrastructureTestBase
     {
         var expires = expiresAt ?? DateTime.UtcNow.AddDays(7);
         return new RefreshToken(Faker.Random.AlphaNumeric(32), user.Id, expires);
+    }
+    
+    /// <summary>
+    /// Creates an expired refresh token for testing using reflection.
+    /// This bypasses constructor validation for test scenarios.
+    /// </summary>
+    private RefreshToken CreateExpiredRefreshToken(User user, DateTime? expiresAt = null)
+    {
+        var expires = expiresAt ?? DateTime.UtcNow.AddDays(-1);
+        var token = new RefreshToken(Faker.Random.AlphaNumeric(32), user.Id, DateTime.UtcNow.AddDays(1));
+        
+        // Use reflection to set the ExpiresAt property to a past date
+        var expiresAtProperty = typeof(RefreshToken).GetProperty("ExpiresAt", 
+            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+        if (expiresAtProperty != null && expiresAtProperty.CanWrite)
+        {
+            expiresAtProperty.SetValue(token, expires);
+        }
+        else
+        {
+            // Try to find the backing field if property setter is not accessible
+            var backingField = typeof(RefreshToken).GetField("<ExpiresAt>k__BackingField",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            backingField?.SetValue(token, expires);
+        }
+        
+        return token;
     }
 
     /// <summary>

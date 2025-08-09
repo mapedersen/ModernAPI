@@ -17,6 +17,10 @@ public class AuthenticationMetrics
     private readonly Histogram<double> _authenticationDuration;
     private readonly UpDownCounter<int> _activeSessions;
 
+    /// <summary>
+    /// Initializes a new instance of the AuthenticationMetrics class.
+    /// </summary>
+    /// <param name="meterFactory">Factory for creating meters</param>
     public AuthenticationMetrics(IMeterFactory meterFactory)
     {
         var meter = meterFactory.Create("ModernAPI.Authentication", "1.0");
@@ -70,11 +74,20 @@ public class AuthenticationMetrics
             description: "Current number of active sessions");
     }
 
+    /// <summary>
+    /// Records a login attempt.
+    /// </summary>
+    /// <param name="method">The authentication method used (default: "password")</param>
     public void RecordLoginAttempt(string method = "password")
     {
         _loginAttempts.Add(1, new KeyValuePair<string, object?>("method", method));
     }
 
+    /// <summary>
+    /// Records a successful login.
+    /// </summary>
+    /// <param name="method">The authentication method used (default: "password")</param>
+    /// <param name="durationMs">The login duration in milliseconds</param>
     public void RecordLoginSuccess(string method = "password", double durationMs = 0)
     {
         _loginSuccesses.Add(1, new KeyValuePair<string, object?>("method", method));
@@ -87,6 +100,12 @@ public class AuthenticationMetrics
         _activeSessions.Add(1);
     }
 
+    /// <summary>
+    /// Records a failed login attempt.
+    /// </summary>
+    /// <param name="method">The authentication method used (default: "password")</param>
+    /// <param name="reason">The reason for the failure (default: "invalid_credentials")</param>
+    /// <param name="durationMs">The login attempt duration in milliseconds</param>
     public void RecordLoginFailure(string method = "password", string reason = "invalid_credentials", double durationMs = 0)
     {
         _loginFailures.Add(1, 
@@ -101,6 +120,11 @@ public class AuthenticationMetrics
         }
     }
 
+    /// <summary>
+    /// Records a user registration attempt.
+    /// </summary>
+    /// <param name="success">Whether the registration was successful (default: true)</param>
+    /// <param name="durationMs">The registration duration in milliseconds</param>
     public void RecordRegistration(bool success = true, double durationMs = 0)
     {
         _registrations.Add(1, new KeyValuePair<string, object?>("status", success ? "success" : "failure"));
@@ -112,6 +136,10 @@ public class AuthenticationMetrics
         }
     }
 
+    /// <summary>
+    /// Records a token refresh operation.
+    /// </summary>
+    /// <param name="success">Whether the token refresh was successful (default: true)</param>
     public void RecordTokenRefresh(bool success = true)
     {
         if (success)
@@ -124,12 +152,19 @@ public class AuthenticationMetrics
         }
     }
 
+    /// <summary>
+    /// Records a user logout.
+    /// </summary>
     public void RecordLogout()
     {
         _logouts.Add(1);
         _activeSessions.Add(-1);
     }
 
+    /// <summary>
+    /// Records a logout from all devices operation.
+    /// </summary>
+    /// <param name="sessionCount">The number of sessions that were logged out</param>
     public void RecordLogoutAll(int sessionCount)
     {
         _logouts.Add(1, new KeyValuePair<string, object?>("type", "all_devices"));
@@ -142,6 +177,11 @@ public class AuthenticationMetrics
 /// </summary>
 public static class MetricsServiceExtensions
 {
+    /// <summary>
+    /// Adds application metrics services to the service collection.
+    /// </summary>
+    /// <param name="services">The service collection to add metrics to</param>
+    /// <returns>The service collection for method chaining</returns>
     public static IServiceCollection AddApplicationMetrics(this IServiceCollection services)
     {
         services.AddSingleton<AuthenticationMetrics>();
