@@ -76,11 +76,11 @@ public class HttpStatusCodeIntegrationTests : IntegrationTestBase
         // Arrange
         var registerRequest = new RegisterRequest(
             $"register-test-{Guid.NewGuid():N}@example.com",
+            "RegisterPassword123!",
+            "RegisterPassword123!",
             "Register Test User",
             "Register",
-            "User",
-            "RegisterPassword123!",
-            "RegisterPassword123!"
+            "User"
         );
 
         // Act
@@ -534,11 +534,11 @@ public class HttpStatusCodeIntegrationTests : IntegrationTestBase
         
         var registerRequest = new RegisterRequest(
             email,
+            password,
+            password,
             "Integration Test User",
             "Integration",
-            "User",
-            password,
-            password
+            "User"
         );
 
         var registerResponse = await PostAsJsonAsync("/api/v1/auth/register", registerRequest);

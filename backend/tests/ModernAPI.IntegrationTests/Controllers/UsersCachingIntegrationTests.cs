@@ -329,11 +329,11 @@ public class UsersCachingIntegrationTests : IntegrationTestBase
     {
         var registerRequest = new RegisterRequest(
             email,
+            "TestPassword123!",
+            "TestPassword123!",
             displayName,
             "Test",
-            "User",
-            "TestPassword123!",
-            "TestPassword123!"
+            "User"
         );
 
         var response = await PostAsJsonAsync("/api/v1/auth/register", registerRequest);
