@@ -12,7 +12,7 @@ RUN apk add --no-cache git
 COPY package.json bun.lockb* ./
 
 # Install dependencies with npm (better native binary support)
-RUN npm install --production=false
+RUN npm install
 
 # Copy source code
 COPY . .

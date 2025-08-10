@@ -2,13 +2,16 @@
 FROM mcr.microsoft.com/dotnet/sdk:9.0-alpine AS build
 WORKDIR /src
 
-# Copy entire source first (simpler approach)
-COPY . .
+# Copy only production projects (exclude tests for faster builds)
+COPY ModernAPI.API/ ModernAPI.API/
+COPY ModernAPI.Application/ ModernAPI.Application/
+COPY ModernAPI.Domain/ ModernAPI.Domain/
+COPY ModernAPI.Infrastructure/ ModernAPI.Infrastructure/
 
-# Restore with retry logic and build
-RUN dotnet restore --verbosity minimal --configfile NuGet.config || \
-    dotnet restore --verbosity minimal --force || \
-    dotnet restore --verbosity minimal
+# Restore only main API project with retry logic (dependencies auto-included)
+RUN dotnet restore ModernAPI.API/ModernAPI.API.csproj --verbosity minimal || \
+    dotnet restore ModernAPI.API/ModernAPI.API.csproj --verbosity minimal --force || \
+    dotnet restore ModernAPI.API/ModernAPI.API.csproj --verbosity minimal
 RUN dotnet publish ModernAPI.API/ModernAPI.API.csproj -c Release -o /app/publish --no-restore
 
 # Runtime
