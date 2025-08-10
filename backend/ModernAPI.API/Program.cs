@@ -18,6 +18,8 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
+
+// ModernAPI v1.0 - Now deployed on Hetzner CCX13 (8GB RAM)
 using OpenTelemetry.Trace;
 using Asp.Versioning;
 using Microsoft.Extensions.Options;
