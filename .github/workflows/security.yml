@@ -54,11 +54,14 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
           
       - name: 📦 Restore dependencies
-        run: dotnet restore
+        run: |
+          cd backend
+          dotnet restore
         
       - name: 🔍 .NET dependency vulnerability scan
         run: |
           echo "🔍 Scanning .NET dependencies for vulnerabilities..."
+          cd backend
           
           # List all packages with vulnerabilities
           dotnet list package --vulnerable --include-transitive 2>&1 | tee dependency-scan.log
@@ -92,11 +95,16 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
+          cache-dependency-path: 'frontend/package.json'
           
       - name: 🔍 NPM audit
         if: always()
         run: |
           echo "🔍 Scanning npm dependencies..."
+          cd frontend
+          
+          # Install dependencies first (using npm for compatibility with audit)
+          npm install
           
           # Run npm audit
           npm audit --audit-level=moderate --json > npm-audit.json 2>/dev/null || true
@@ -163,6 +171,7 @@ jobs:
           
       - name: 🏗️ Build for CodeQL analysis
         run: |
+          cd backend
           dotnet restore
           dotnet build --no-restore --configuration Release
           
@@ -211,8 +220,6 @@ jobs:
       - name: 🔐 TruffleHog secret scan
         uses: trufflesecurity/trufflehog@main
         with:
-          base: ${{ github.event.repository.default_branch }}
-          head: HEAD
           path: .
           extra_args: --debug --only-verified
           
@@ -291,11 +298,17 @@ jobs:
           format: 'sarif'
           output: 'trivy-container-results.sarif'
           
-      - name: 📊 Upload Trivy container scan results
+      - name: 📊 Upload Trivy backend scan results
         if: always()
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: 'trivy-container-results.sarif'
+          sarif_file: 'trivy-backend-results.sarif'
+          
+      - name: 📊 Upload Trivy frontend scan results
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-frontend-results.sarif'
           
       - name: 🔍 Run Trivy filesystem scan
         uses: aquasecurity/trivy-action@master
