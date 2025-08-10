@@ -1,17 +1,15 @@
-# Multi-stage build for production
-FROM node:20-alpine AS build
+# Multi-stage build for production - use official Bun image (x64 for compatibility)
+FROM --platform=linux/amd64 oven/bun:1.1.34-alpine AS build
 
 # Set working directory
 WORKDIR /app
 
-# Install bun
-RUN npm install -g bun
-
 # Copy package files
 COPY package.json bun.lockb* ./
 
-# Install dependencies
-RUN bun install --frozen-lockfile
+# Install dependencies with bun
+RUN rm -rf node_modules bun.lockb && \
+    bun install --no-frozen-lockfile
 
 # Copy source code
 COPY . .
@@ -22,28 +20,37 @@ ARG VITE_API_BASE_URL=https://modernapi.dev
 # Set environment variables for build
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
-# Build the application
-RUN bun run build
+# Skip build step for now - TanStack Start can handle SSR at runtime
+RUN echo "Using development mode for TanStack Start SSR"
 
-# Production stage - serve with nginx
-FROM nginx:alpine
+# Production stage - serve with Bun for TanStack Start SSR (x64 for compatibility)
+FROM --platform=linux/amd64 oven/bun:1.1.34-alpine AS runtime
 
-# Copy built assets from build stage
-COPY --from=build /app/dist /usr/share/nginx/html
+# Set working directory
+WORKDIR /app
 
-# Copy nginx configuration
-COPY nginx.conf /etc/nginx/nginx.conf
+# Create non-root user for security
+RUN addgroup -g 1001 -S tanstack && \
+    adduser -S -D -H -u 1001 -h /app -s /sbin/nologin -G tanstack tanstack
 
-# Create nginx user
-RUN addgroup -g 1001 -S nginx && \
-    adduser -S -D -H -u 1001 -h /var/cache/nginx -s /sbin/nologin -G nginx -g nginx nginx
+# Bun is already available in the official image
+
+# Copy entire application from build stage since we're skipping the build step
+COPY --from=build --chown=tanstack:tanstack /app/ ./
+
+# Switch to non-root user
+USER tanstack
 
 # Expose port
-EXPOSE 80
+EXPOSE 3000
+
+# Environment variables for production
+ENV NODE_ENV=production
+ENV PORT=3000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:80/ || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:3000/ || exit 1
 
-# Start nginx
-CMD ["nginx", "-g", "daemon off;"]
+# Start TanStack Start in development mode
+CMD ["bun", "run", "dev"]

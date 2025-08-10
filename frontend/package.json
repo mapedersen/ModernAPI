@@ -95,5 +95,8 @@
   "trustedDependencies": [
     "@parcel/watcher",
     "@tailwindcss/oxide"
-  ]
+  ],
+  "optionalDependencies": {
+    "@rollup/rollup-linux-x64-gnu": "^4.40.1"
+  }
 }
