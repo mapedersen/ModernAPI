@@ -503,7 +503,7 @@ jobs:
       - name: 🧪 Production Health Check
         run: |
           echo "🔍 Running production health checks..."
-          VPS_URL="${{ secrets.VPS_URL || 'http://your-vps-ip:5001' }}"
+          VPS_URL="http://localhost:5001"
           
           for i in {1..15}; do
             if curl -f "$VPS_URL/health"; then
