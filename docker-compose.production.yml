@@ -19,9 +19,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256M
+          memory: 192M
         reservations:
-          memory: 128M
+          memory: 96M
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-modernapi_prod}"]
       interval: 30s
@@ -82,9 +82,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 384M
+          memory: 320M
         reservations:
-          memory: 256M
+          memory: 192M
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
       interval: 30s
@@ -112,9 +112,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256M
+          memory: 192M
         reservations:
-          memory: 128M
+          memory: 96M
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
       interval: 30s
