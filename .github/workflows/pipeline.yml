@@ -285,7 +285,7 @@ jobs:
   deploy-staging:
     name: 🎭 Deploy to Staging
     runs-on: ubuntu-latest
-    needs: [orchestrator, build-and-publish]
+    needs: [orchestrator, quality-gate, code-quality]
     if: needs.orchestrator.outputs.should_deploy_staging == 'true'
     environment:
       name: staging
@@ -481,7 +481,7 @@ jobs:
   pipeline-summary:
     name: 📊 Pipeline Summary
     runs-on: ubuntu-latest
-    needs: [orchestrator, quality-gate, code-quality, deploy-staging, deploy-production]
+    needs: [orchestrator]
     if: always()
     
     steps:
@@ -491,21 +491,21 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**🎯 Execution:** ${{ github.event_name }} on \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY  
           echo "**📦 Version:** \`${{ needs.orchestrator.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**⏱️ Duration:** $(date -u -d @$(($(date +%s) - ${{ github.event.head_commit.timestamp }})) +'%H:%M:%S')" >> $GITHUB_STEP_SUMMARY
+          echo "**⏱️ Started:** $(date -u --iso-8601=seconds)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## 📋 Stage Results" >> $GITHUB_STEP_SUMMARY
-          echo "| Stage | Status | Duration |" >> $GITHUB_STEP_SUMMARY
-          echo "|-------|--------|----------|" >> $GITHUB_STEP_SUMMARY
-          echo "| 🧪 Quality Gate | ${{ needs.quality-gate.result }} | - |" >> $GITHUB_STEP_SUMMARY
-          echo "| 🔍 Code Quality | ${{ needs.code-quality.result }} | - |" >> $GITHUB_STEP_SUMMARY
-          echo "| 🎭 Deploy Staging | ${{ needs.deploy-staging.result || 'skipped' }} | - |" >> $GITHUB_STEP_SUMMARY
-          echo "| 🚀 Deploy Production | ${{ needs.deploy-production.result || 'skipped' }} | - |" >> $GITHUB_STEP_SUMMARY
+          echo "## 🎯 Pipeline Configuration" >> $GITHUB_STEP_SUMMARY
+          echo "- **🧪 Tests:** ${{ needs.orchestrator.outputs.should_test }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **🎭 Deploy Staging:** ${{ needs.orchestrator.outputs.should_deploy_staging }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **🚀 Deploy Production:** ${{ needs.orchestrator.outputs.should_deploy_production }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **🌍 Target Environment:** ${{ needs.orchestrator.outputs.target_environment }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
-          if [[ "${{ needs.deploy-production.result }}" == "success" ]]; then
-            echo "🎉 **Production deployment successful!** Your changes are now live." >> $GITHUB_STEP_SUMMARY
-          elif [[ "${{ needs.deploy-staging.result }}" == "success" ]]; then
-            echo "🎭 **Staging deployment successful!** Ready for production when you are." >> $GITHUB_STEP_SUMMARY
+          if [[ "${{ needs.orchestrator.outputs.should_deploy_production }}" == "true" ]]; then
+            echo "🚀 **Production deployment initiated!** Check individual job results for status." >> $GITHUB_STEP_SUMMARY
+          elif [[ "${{ needs.orchestrator.outputs.should_deploy_staging }}" == "true" ]]; then
+            echo "🎭 **Staging deployment initiated!** Check individual job results for status." >> $GITHUB_STEP_SUMMARY
+          elif [[ "${{ needs.orchestrator.outputs.should_test }}" == "true" ]]; then
+            echo "🧪 **Quality checks initiated!** Check individual job results for status." >> $GITHUB_STEP_SUMMARY
           else
-            echo "🧪 **Quality checks complete!** Code is ready for deployment." >> $GITHUB_STEP_SUMMARY
+            echo "ℹ️ **Pipeline orchestrated successfully!**" >> $GITHUB_STEP_SUMMARY
           fi
