@@ -3,12 +3,11 @@ name: 📢 CI/CD Notifications
 on:
   workflow_run:
     workflows: 
-      - "🔄 Continuous Integration"
-      - "🐳 Docker Build & Registry"
-      - "🚀 Deploy to Staging"
-      - "🚀 Deploy to Production"
+      - "🚀 ModernAPI Pipeline"
+      - "🎯 Manual Deployment"
       - "📦 Release Management"
       - "🔒 Security Scanning"
+      - "🔍 PR Preview Environment"
     types: [completed]
   workflow_dispatch:
     inputs:
@@ -91,7 +90,8 @@ jobs:
             
             # Always notify for production and critical workflows
             if [[ "$ENVIRONMENT" == "production" ]] || 
-               [[ "$WORKFLOW_NAME" =~ "Production" ]] ||
+               [[ "$WORKFLOW_NAME" =~ "Pipeline" ]] ||
+               [[ "$WORKFLOW_NAME" =~ "Manual Deployment" ]] ||
                [[ "$WORKFLOW_NAME" =~ "Release" ]] ||
                [[ "$WORKFLOW_NAME" =~ "Security" ]]; then
               SHOULD_NOTIFY="true"
@@ -180,7 +180,7 @@ jobs:
             ${{
               needs.analyze-workflow.outputs.workflow_conclusion == 'failure' && 
               ':warning: *Immediate attention required!*' ||
-              needs.analyze-workflow.outputs.workflow_name == 'Deploy to Production' &&
+              (needs.analyze-workflow.outputs.workflow_name == 'Manual Deployment' || needs.analyze-workflow.outputs.workflow_name == 'ModernAPI Pipeline') &&
               needs.analyze-workflow.outputs.workflow_conclusion == 'success' &&
               ':rocket: *Production deployment completed successfully!*' ||
               ''

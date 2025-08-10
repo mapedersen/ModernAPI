@@ -195,7 +195,7 @@ jobs:
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ needs.prepare-deployment.outputs.target_environment == 'production' && secrets.VPS_HOST || secrets.STAGING_HOST }}
-          username: ${{ needs.prepare-deployment.outputs.target_environment == 'production' && secrets.VPS_USERNAME || secrets.STAGING_USERNAME }}
+          username: ${{ needs.prepare-deployment.outputs.target_environment == 'production' && secrets.VPS_USER || secrets.STAGING_USER }}
           key: ${{ needs.prepare-deployment.outputs.target_environment == 'production' && secrets.VPS_SSH_KEY || secrets.STAGING_SSH_KEY }}
           port: ${{ needs.prepare-deployment.outputs.target_environment == 'production' && secrets.VPS_PORT || secrets.STAGING_PORT || 22 }}
           script: |
