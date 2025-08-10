@@ -64,7 +64,7 @@ jobs:
         cd ..
         
         # Copy frontend build
-        cp -r frontend/dist/* deploy/frontend/
+        cp -r frontend/.output/public/. deploy/frontend/
         
         # Copy Docker files
         cp docker-compose.production.yml deploy/docker/
