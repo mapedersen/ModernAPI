@@ -35,7 +35,7 @@ RUN echo "Verifying build output..." && \
     echo "✅ Build verification passed"
 
 # Production stage - runtime with Bun
-FROM oven/bun:1.1.34-alpine AS runtime
+FROM oven/bun:1.2.20-alpine AS runtime
 
 # Set working directory
 WORKDIR /app
