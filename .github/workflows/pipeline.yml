@@ -47,6 +47,7 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
   PLATFORMS: linux/amd64,linux/arm64
+  COMPOSE_BAKE: true
 
 # 🔄 Smart concurrency control
 concurrency:
@@ -438,7 +439,7 @@ jobs:
             
             # Build and start services with deployment tracking
             echo "🔨 Building and starting services..."
-            if docker compose --env-file .env -f docker-compose.production.yml up -d --build; then
+            if COMPOSE_BAKE=true docker compose --env-file .env -f docker-compose.production.yml up -d --build; then
               echo "✅ Containers started successfully"
               
               # Verify all containers are running
