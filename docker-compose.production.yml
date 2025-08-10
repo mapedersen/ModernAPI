@@ -53,7 +53,7 @@ services:
   api:
     build:
       context: ./backend
-      dockerfile: ModernAPI.API/Dockerfile
+      dockerfile: Dockerfile.simple
     container_name: modernapi_api
     restart: unless-stopped
     environment:
@@ -74,7 +74,7 @@ services:
       - Email__FromEmail=${FROM_EMAIL}
       - Email__FromName=${FROM_NAME:-ModernAPI}
     ports:
-      - "5000:5000"
+      - "5001:5000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -95,7 +95,7 @@ services:
       retries: 3
       start_period: 40s
 
-  # Frontend (React/TanStack)
+  # Frontend (TanStack Start with Bun SSR)
   frontend:
     build:
       context: ./frontend
@@ -104,18 +104,22 @@ services:
         - VITE_API_BASE_URL=${API_BASE_URL:-https://modernapi.dev}
     container_name: modernapi_frontend
     restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - VITE_API_BASE_URL=${API_BASE_URL:-https://modernapi.dev}
     ports:
-      - "3000:80"
+      - "3001:3000"
     networks:
       - modernapi_network
     deploy:
       resources:
         limits:
-          memory: 128M
+          memory: 256M
         reservations:
-          memory: 64M
+          memory: 128M
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
       interval: 30s
       timeout: 5s
       retries: 3

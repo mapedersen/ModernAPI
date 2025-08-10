@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '~/com
 import { Button } from '~/components/ui/button'
 import { Badge } from '~/components/ui/badge'
 import { Avatar, AvatarFallback } from '~/components/ui/avatar'
+import { DashboardSkeleton } from '~/components/ui/skeleton-cards'
 import { 
   Users, 
   Activity, 
@@ -25,25 +26,46 @@ export const Route = createFileRoute('/dashboard')({
   beforeLoad: ({ context }) => {
     // This will be handled by AuthGuard component when we add it
   },
-  loader: async () => {
-    try {
-      const usersData = await getUsers()
-      return { usersData }
-    } catch (error) {
-      console.error('Failed to load dashboard data:', error)
-      return { usersData: null }
-    }
-  },
   component: DashboardPage,
 })
 
 function DashboardPage() {
-  const { usersData } = Route.useLoaderData()
-  const { user, clearAuth } = useAuthStore()
-  
-  const handleLogout = () => {
-    clearAuth()
-    window.location.href = '/auth/login'
+  const { user } = useAuthStore()
+  const [usersData, setUsersData] = React.useState<any>(null)
+  const [loading, setLoading] = React.useState(true)
+  const [error, setError] = React.useState<string | null>(null)
+
+  // Load users data on client side
+  React.useEffect(() => {
+    const loadUsers = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        const data = await getUsers()
+        setUsersData(data)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load users')
+        console.error('Failed to load users:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadUsers()
+  }, [])
+
+  const handleRefreshUsers = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const data = await getUsers()
+      setUsersData(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load users')
+      console.error('Failed to refresh users:', err)
+    } finally {
+      setLoading(false)
+    }
   }
 
   const stats = [
@@ -81,44 +103,15 @@ function DashboardPage() {
     }
   ]
 
-  const recentUsers = usersData?.users?.slice(0, 5) || []
+  const recentUsers = usersData?.items?.slice(0, 5) || []
+
+  // Show skeleton while loading
+  if (loading) {
+    return <DashboardSkeleton />
+  }
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="bg-background border-b sticky top-0 z-10">
-        <div className="px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <Shield className="w-4 h-4 text-primary" />
-                </div>
-                <h1 className="text-2xl font-bold">ModernAPI Dashboard</h1>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <Avatar>
-                  <AvatarFallback>
-                    {user?.displayName?.charAt(0) || 'U'}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="hidden md:block text-right">
-                  <p className="text-sm font-medium">{user?.displayName}</p>
-                  <p className="text-xs text-muted-foreground">{user?.email}</p>
-                </div>
-              </div>
-              
-              <Button variant="outline" size="sm" onClick={handleLogout}>
-                <LogOut className="w-4 h-4 mr-2" />
-                Sign Out
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
 
       <div className="p-6">
         <div className="max-w-7xl mx-auto space-y-6">
@@ -176,13 +169,28 @@ function DashboardPage() {
                     Latest users registered in your system
                   </CardDescription>
                 </div>
-                <Button variant="outline" size="sm">
-                  <RefreshCw className="w-4 h-4 mr-2" />
+                <Button variant="outline" size="sm" onClick={handleRefreshUsers} disabled={loading}>
+                  <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
                   Refresh
                 </Button>
               </CardHeader>
               <CardContent>
-                {recentUsers.length > 0 ? (
+                {loading ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <RefreshCw className="w-12 h-12 mx-auto mb-4 animate-spin opacity-50" />
+                    <p>Loading users...</p>
+                  </div>
+                ) : error ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>Failed to load users</p>
+                    <p className="text-sm text-red-600 mb-4">{error}</p>
+                    <Button variant="outline" onClick={handleRefreshUsers}>
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      Try Again
+                    </Button>
+                  </div>
+                ) : recentUsers.length > 0 ? (
                   <div className="space-y-4">
                     {recentUsers.map((user: BackendUserDto) => (
                       <div key={user.id} className="flex items-center justify-between p-3 rounded-lg border">
@@ -214,10 +222,10 @@ function DashboardPage() {
                 ) : (
                   <div className="text-center py-8 text-muted-foreground">
                     <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                    <p>No users found or failed to load users</p>
-                    <Button variant="outline" className="mt-4">
+                    <p>No users found</p>
+                    <Button variant="outline" onClick={handleRefreshUsers}>
                       <RefreshCw className="w-4 h-4 mr-2" />
-                      Try Again
+                      Refresh
                     </Button>
                   </div>
                 )}

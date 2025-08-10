@@ -363,8 +363,9 @@ static void ConfigureServices(IServiceCollection services, IConfiguration config
         healthChecksBuilder.AddRedis(redisConnectionString, name: "redis", tags: new[] { "cache", "ready" });
     }
 
-    // Add Problem Details
-    services.AddProblemDetails();
+    // Note: ProblemDetails schemas are auto-generated from controller [ProducesResponseType] attributes
+    // AddProblemDetails() conflicts with these auto-generated schemas in .NET 9 OpenAPI
+    // services.AddProblemDetails();
 }
 
 static async Task ConfigurePipeline(WebApplication app)

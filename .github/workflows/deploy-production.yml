@@ -510,8 +510,8 @@ jobs:
           
           # Run migrations with production connection
           dotnet ef database update \
-            --project ModernAPI.Infrastructure \
-            --startup-project ModernAPI.API \
+            --project backend/ModernAPI.Infrastructure \
+            --startup-project backend/ModernAPI.API \
             --connection "${{ secrets.PRODUCTION_DATABASE_URL }}" \
             --verbose
             

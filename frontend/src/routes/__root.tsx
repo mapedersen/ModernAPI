@@ -11,6 +11,7 @@ import * as React from 'react'
 import { ThemeProvider } from 'next-themes'
 import { DefaultCatchBoundary } from '~/components/DefaultCatchBoundary'
 import { NotFound } from '~/components/NotFound'
+import { Header } from '~/components/layout/Header'
 import appCss from '~/styles/app.css?url'
 import { seo } from '~/utils/seo'
 
@@ -60,28 +61,53 @@ export const Route = createRootRoute({
 function RootComponent() {
   const location = useLocation()
   const isDocsRoute = location.pathname.startsWith('/docs')
+  const isAuthRoute = location.pathname.startsWith('/auth')
+  const isDashboardRoute = location.pathname.startsWith('/dashboard')
+
+  // Determine header variant and visibility
+  const showHeader = !isAuthRoute // Hide header on auth pages
+  const headerVariant = isDocsRoute ? 'minimal' : 'default'
 
   return (
-    <html>
+    <html suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>
       <body className="bg-background font-sans antialiased">
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
+          defaultTheme="light"
           enableSystem
           disableTransitionOnChange
+          storageKey="modernapi-theme"
         >
-          {isDocsRoute ? (
-            // Docs layout handled by docs.tsx
-            <Outlet />
-          ) : (
-            // Clean main app layout
-            <div className="min-h-screen">
+          {/* Skip to main content link for accessibility */}
+          <a
+            href="#main-content"
+            className="sr-only focus:not-sr-only focus:absolute focus:top-0 focus:left-0 z-50 bg-primary text-primary-foreground px-4 py-2 rounded-md m-2 transition-all"
+          >
+            Skip to main content
+          </a>
+
+          {/* Persistent Header */}
+          {showHeader && <Header variant={headerVariant} />}
+
+          <main id="main-content" className="focus:outline-none">
+            {isDocsRoute ? (
+              // Docs layout handled by docs.tsx
               <Outlet />
-            </div>
-          )}
+            ) : isDashboardRoute ? (
+              // Dashboard layout without additional header (has its own)
+              <div className="min-h-screen">
+                <Outlet />
+              </div>
+            ) : (
+              // Clean main app layout with proper spacing
+              <div className={showHeader ? "min-h-[calc(100vh-4rem)]" : "min-h-screen"}>
+                <Outlet />
+              </div>
+            )}
+          </main>
         </ThemeProvider>
         <TanStackRouterDevtools position="bottom-right" />
         <Scripts />

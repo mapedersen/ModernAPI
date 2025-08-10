@@ -2,6 +2,7 @@ import { Link, useLocation } from '@tanstack/react-router'
 import { cn } from '~/lib/utils'
 import { platformSections, handbookItem } from '~/data/platform'
 import { ChevronDown, ChevronRight, BookOpen } from 'lucide-react'
+import { SearchBox } from '~/components/docs/SearchBox'
 import React, { useState } from 'react'
 
 export function Navigation() {
@@ -28,7 +29,7 @@ export function Navigation() {
     <nav className="fixed left-0 top-0 w-80 bg-card border-r border-border h-screen overflow-y-auto flex flex-col z-10">
       {/* Header */}
       <div className="p-6 border-b border-border">
-        <Link to="/" className="flex items-center gap-3 group hover:bg-accent/50 rounded-lg p-2 -m-2 transition-colors">
+        <Link to="/" className="flex items-center gap-3 group hover:bg-accent/50 rounded-lg p-2 -m-2 transition-colors mb-4">
           <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center group-hover:scale-105 transition-transform">
             <BookOpen className="w-5 h-5 text-primary-foreground" />
           </div>
@@ -37,6 +38,9 @@ export function Navigation() {
             <p className="text-sm text-muted-foreground">Technical Documentation</p>
           </div>
         </Link>
+        
+        {/* Search Box */}
+        <SearchBox />
       </div>
 
       {/* Handbook - Top Level */}

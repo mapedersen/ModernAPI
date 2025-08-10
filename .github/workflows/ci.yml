@@ -57,7 +57,7 @@ jobs:
           restore-keys: nuget-${{ runner.os }}-
           
       - name: 🔧 Restore dependencies
-        run: dotnet restore
+        run: dotnet restore backend/
         
       - name: 🎨 Check code formatting
         run: dotnet format --verify-no-changes --verbosity diagnostic
@@ -140,34 +140,34 @@ jobs:
           restore-keys: nuget-${{ matrix.os }}-
           
       - name: 🔧 Restore dependencies
-        run: dotnet restore
+        run: dotnet restore backend/
         
       - name: 🏗️ Build solution
-        run: dotnet build --no-restore --configuration Release
+        run: dotnet build backend/ --no-restore --configuration Release
         
       - name: 📊 Apply database migrations
         run: |
           dotnet tool install --global dotnet-ef
-          dotnet ef database update --project ModernAPI.Infrastructure --startup-project ModernAPI.API
+          dotnet ef database update --project backend/ModernAPI.Infrastructure --startup-project backend/ModernAPI.API
         env:
           POSTGRES_CONNECTION_STRING: ${{ env.POSTGRES_CONNECTION_STRING }}
           
       - name: 🧪 Run unit tests
         run: |
-          dotnet test tests/ModernAPI.Domain.Tests --no-build --configuration Release --logger trx --results-directory TestResults/Unit
-          dotnet test tests/ModernAPI.Application.Tests --no-build --configuration Release --logger trx --results-directory TestResults/Unit
+          dotnet test backend/tests/ModernAPI.Domain.Tests --no-build --configuration Release --logger trx --results-directory TestResults/Unit
+          dotnet test backend/tests/ModernAPI.Application.Tests --no-build --configuration Release --logger trx --results-directory TestResults/Unit
           
       - name: 🧪 Run integration tests
         run: |
-          dotnet test tests/ModernAPI.Infrastructure.Tests --no-build --configuration Release --logger trx --results-directory TestResults/Integration
-          dotnet test tests/ModernAPI.API.Tests --no-build --configuration Release --logger trx --results-directory TestResults/Integration
+          dotnet test backend/tests/ModernAPI.Infrastructure.Tests --no-build --configuration Release --logger trx --results-directory TestResults/Integration
+          dotnet test backend/tests/ModernAPI.API.Tests --no-build --configuration Release --logger trx --results-directory TestResults/Integration
         env:
           POSTGRES_CONNECTION_STRING: ${{ env.POSTGRES_CONNECTION_STRING }}
           JWT_SECRET: ${{ env.JWT_SECRET }}
           
       - name: 🧪 Run end-to-end tests
         run: |
-          dotnet test tests/ModernAPI.IntegrationTests --no-build --configuration Release --logger trx --results-directory TestResults/E2E
+          dotnet test backend/tests/ModernAPI.IntegrationTests --no-build --configuration Release --logger trx --results-directory TestResults/E2E
         env:
           POSTGRES_CONNECTION_STRING: ${{ env.POSTGRES_CONNECTION_STRING }}
           JWT_SECRET: ${{ env.JWT_SECRET }}
@@ -220,7 +220,7 @@ jobs:
           restore-keys: nuget-coverage-
           
       - name: 🔧 Restore dependencies
-        run: dotnet restore
+        run: dotnet restore backend/
         
       - name: 🏗️ Build solution
         run: dotnet build --no-restore --configuration Debug
@@ -228,7 +228,7 @@ jobs:
       - name: 📊 Apply database migrations
         run: |
           dotnet tool install --global dotnet-ef
-          dotnet ef database update --project ModernAPI.Infrastructure --startup-project ModernAPI.API
+          dotnet ef database update --project backend/ModernAPI.Infrastructure --startup-project backend/ModernAPI.API
         env:
           POSTGRES_CONNECTION_STRING: ${{ env.POSTGRES_CONNECTION_STRING }}
           
@@ -290,7 +290,7 @@ jobs:
           restore-keys: nuget-security-
           
       - name: 🔧 Restore dependencies
-        run: dotnet restore
+        run: dotnet restore backend/
         
       - name: 🔒 Run security scan
         run: |
@@ -393,7 +393,7 @@ jobs:
       - name: 📊 Apply database migrations
         run: |
           dotnet tool install --global dotnet-ef
-          dotnet ef database update --project ModernAPI.Infrastructure --startup-project ModernAPI.API
+          dotnet ef database update --project backend/ModernAPI.Infrastructure --startup-project backend/ModernAPI.API
         env:
           POSTGRES_CONNECTION_STRING: ${{ env.POSTGRES_CONNECTION_STRING }}
           

@@ -158,8 +158,8 @@ jobs:
       - name: 🏗️ Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: .
-          file: ./Dockerfile
+          context: ./backend
+          file: ./backend/Dockerfile
           platforms: ${{ env.PLATFORMS }}
           push: ${{ needs.metadata.outputs.should_push == 'true' }}
           tags: ${{ needs.metadata.outputs.tags }}
@@ -309,7 +309,7 @@ jobs:
           # Test health endpoint
           echo "🔍 Testing health endpoint..."
           for i in {1..10}; do
-            if curl -f http://localhost:8080/health; then
+            if curl -f http://localhost:5000/health; then
               echo "✅ Health check passed"
               break
             fi
@@ -377,8 +377,8 @@ jobs:
           secrets[matrix.registry.password] != ''
         uses: docker/build-push-action@v5
         with:
-          context: .
-          file: ./Dockerfile
+          context: ./backend
+          file: ./backend/Dockerfile
           platforms: ${{ env.PLATFORMS }}
           push: true
           tags: |

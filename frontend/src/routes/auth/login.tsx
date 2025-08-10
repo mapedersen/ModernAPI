@@ -121,6 +121,7 @@ function LoginPage() {
                             <Input 
                               placeholder="admin@modernapi.dev" 
                               type="email"
+                              autoComplete="username"
                               disabled={isLoading}
                               {...field} 
                             />
@@ -141,6 +142,7 @@ function LoginPage() {
                               <Input
                                 type={showPassword ? 'text' : 'password'}
                                 placeholder="Enter your password"
+                                autoComplete="current-password"
                                 disabled={isLoading}
                                 {...field}
                               />

@@ -1,0 +1,165 @@
+/* Accessibility improvements for touch targets and focus states */
+
+/* Ensure minimum 44px touch targets on mobile */
+@media (max-width: 768px) {
+  button,
+  a[role="button"],
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"] {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 0.75rem 1rem;
+  }
+  
+  /* Smaller buttons should still meet the minimum */
+  button[data-size="sm"],
+  .btn-sm {
+    min-height: 44px;
+    padding: 0.5rem 1rem;
+  }
+  
+  /* Navigation items should be easily tappable */
+  nav a,
+  nav button {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1rem;
+  }
+}
+
+/* Improved focus indicators */
+*:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+  border-radius: 0.375rem;
+}
+
+/* High contrast focus for interactive elements */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px hsl(var(--ring) / 0.2);
+}
+
+/* Skip link styling */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 6px;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  padding: 8px;
+  border-radius: 4px;
+  text-decoration: none;
+  font-weight: 600;
+  z-index: 100;
+  transition: top 0.3s;
+}
+
+.skip-link:focus {
+  top: 6px;
+}
+
+/* Ensure interactive elements are properly sized on touch devices */
+@media (hover: none) and (pointer: coarse) {
+  /* Touch devices */
+  button,
+  a[role="button"],
+  [role="tab"],
+  [role="menuitem"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Increase spacing between interactive elements */
+  button + button,
+  a + a,
+  button + a,
+  a + button {
+    margin-left: 0.5rem;
+  }
+}
+
+/* Better visibility for disabled states */
+:disabled,
+[aria-disabled="true"] {
+  opacity: 0.6;
+  cursor: not-allowed;
+  filter: grayscale(50%);
+}
+
+/* Ensure links are easily identifiable */
+a:not([class*="button"]):not([class*="btn"]) {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+a:hover {
+  text-decoration-thickness: 2px;
+}
+
+/* Improve form accessibility */
+input[required],
+select[required],
+textarea[required] {
+  border-left: 3px solid hsl(var(--destructive));
+}
+
+input:invalid,
+select:invalid,
+textarea:invalid {
+  border-color: hsl(var(--destructive));
+}
+
+input:valid:not(:placeholder-shown),
+select:valid,
+textarea:valid:not(:placeholder-shown) {
+  border-left: 3px solid hsl(var(--success, 142 76% 36%));
+}
+
+/* Better error message styling */
+[role="alert"],
+.error-message {
+  color: hsl(var(--destructive));
+  font-weight: 500;
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+
+/* Loading states */
+[aria-busy="true"] {
+  cursor: wait;
+  pointer-events: none;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  * {
+    border-color: currentColor;
+  }
+  
+  button,
+  input,
+  select,
+  textarea {
+    border: 1px solid currentColor;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

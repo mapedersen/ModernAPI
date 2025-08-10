@@ -1,5 +1,6 @@
 /* src/styles/app.css */
 @import 'tailwindcss';
+@import './accessibility.css';
 
 @custom-variant dark (&:is(.dark *));
 
