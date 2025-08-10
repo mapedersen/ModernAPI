@@ -19,7 +19,7 @@ using System.Text;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 
-// ModernAPI v1.0 - Now deployed on Hetzner CCX13 (8GB RAM)
+// ModernAPI v1.0 - Deployed on Hetzner CCX13 (8GB RAM) with proper permissions
 using OpenTelemetry.Trace;
 using Asp.Versioning;
 using Microsoft.Extensions.Options;
