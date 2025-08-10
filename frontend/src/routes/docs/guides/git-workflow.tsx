@@ -305,7 +305,7 @@ function GitWorkflowPage() {
           message: 'feat(auth): implement JWT authentication system',
           author: 'Alice Johnson',
           timestamp: new Date('2024-01-15T10:30:00Z'),
-          type: commitTypes[0],
+          type: commitTypes[0]!,
           breaking: false,
           description: 'Add complete JWT authentication with refresh tokens',
           verified: true
@@ -316,7 +316,7 @@ function GitWorkflowPage() {
           message: 'fix(api): resolve CORS configuration issues',
           author: 'Bob Smith',
           timestamp: new Date('2024-01-14T15:45:00Z'),
-          type: commitTypes[1],
+          type: commitTypes[1]!,
           breaking: false,
           description: 'Fix CORS middleware configuration for production',
           verified: true
@@ -337,7 +337,7 @@ function GitWorkflowPage() {
           message: 'feat(user): add user profile management',
           author: 'Carol Davis',
           timestamp: new Date('2024-01-16T09:15:00Z'),
-          type: commitTypes[0],
+          type: commitTypes[0]!,
           breaking: false,
           description: 'Implement complete user profile CRUD operations',
           verified: true
@@ -397,7 +397,7 @@ function GitWorkflowPage() {
           message: 'feat(payment): implement Stripe payment service',
           author: 'David Wilson',
           timestamp: new Date('2024-01-16T11:00:00Z'),
-          type: commitTypes[0],
+          type: commitTypes[0]!,
           breaking: false,
           description: 'Add Stripe payment processing with webhook support',
           verified: true
@@ -418,7 +418,7 @@ function GitWorkflowPage() {
           message: 'fix(security): patch SQL injection vulnerability',
           author: 'Security Team',
           timestamp: new Date('2024-01-16T13:20:00Z'),
-          type: commitTypes[1],
+          type: commitTypes[1]!,
           breaking: false,
           description: 'Fix SQL injection in user search endpoint',
           verified: true

@@ -72,7 +72,6 @@ function RootComponent() {
           defaultTheme="system"
           enableSystem
           disableTransitionOnChange
-          suppressHydrationWarning
         >
           {isDocsRoute ? (
             // Docs layout handled by docs.tsx

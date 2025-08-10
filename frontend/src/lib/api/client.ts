@@ -13,7 +13,7 @@ import type {
 } from '~/types/auth'
 import type { GetUsersResponse } from '~/types/user'
 
-const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:5000'
+const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:5051'
 
 // Helper to extract cookies
 function extractTokenFromCookies(cookies: string, tokenName: string): string | null {
@@ -48,7 +48,7 @@ export const loginUser = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     console.log('Server function received data:', data)
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1.0/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
@@ -74,7 +74,7 @@ export const registerUser = createServerFn({ method: 'POST' })
   .validator((data: RegisterRequest) => data)
   .handler(async ({ data }) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1.0/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
@@ -106,7 +106,7 @@ export const getCurrentUser = createServerFn({ method: 'GET' })
         return null
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1.0/auth/me`, {
         headers: { 
           'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json'
@@ -140,7 +140,7 @@ export const refreshTokens = createServerFn({ method: 'POST' })
   .validator((data: RefreshTokenRequest) => data)
   .handler(async ({ data }) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1.0/auth/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
@@ -171,7 +171,7 @@ export const logoutUser = createServerFn({ method: 'POST' })
       
       if (refreshToken) {
         // Call backend logout to invalidate refresh token
-        await fetch(`${API_BASE_URL}/api/auth/logout`, {
+        await fetch(`${API_BASE_URL}/api/v1.0/auth/logout`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ refreshToken })
@@ -199,7 +199,7 @@ export const changePassword = createServerFn({ method: 'POST' })
         throw new Error('Not authenticated')
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/auth/change-password`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1.0/auth/change-password`, {
         method: 'POST',
         headers: { 
           'Authorization': `Bearer ${accessToken}`,
@@ -231,7 +231,7 @@ export const getUsers = createServerFn({ method: 'GET' })
         throw new Error('Not authenticated')
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/users?page=1&pageSize=10`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1.0/users?page=1&pageSize=10`, {
         headers: { 
           'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json'

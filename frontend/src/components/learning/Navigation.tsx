@@ -72,9 +72,7 @@ export function Navigation() {
             <div className="mt-2">
               <span className={cn(
                 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium',
-                handbookItem.difficulty === 'beginner' && 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400',
-                handbookItem.difficulty === 'intermediate' && 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400',
-                handbookItem.difficulty === 'advanced' && 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
+                'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400' // handbookItem is always intermediate
               )}>
                 {handbookItem.difficulty}
               </span>

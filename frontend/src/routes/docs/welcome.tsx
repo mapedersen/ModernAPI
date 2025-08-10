@@ -12,7 +12,8 @@ import {
   Zap,
   Shield,
   Code,
-  Star
+  Star,
+  CheckCircle
 } from 'lucide-react'
 import { AuthGuard } from '~/components/auth/AuthGuard'
 import { ModuleNavigation, useModuleCompletion } from '~/components/learning/ModuleNavigation'
@@ -85,13 +86,13 @@ function WelcomePage() {
 
             {/* Call to Actions */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
-              <Link to="/handbook">
+              <Link to="/docs/handbook">
                 <Button size="lg" className="px-8 py-6 text-lg">
                   <BookOpen className="w-5 h-5 mr-2" />
                   Read Handbook
                 </Button>
               </Link>
-              <Link to="/learn/architecture">
+              <Link to="/docs/learn/architecture">
                 <Button size="lg" variant="outline" className="px-8 py-6 text-lg">
                   <ArrowRight className="w-5 h-5 mr-2" />
                   Explore Architecture
@@ -230,7 +231,7 @@ function WelcomePage() {
             <p className="text-muted-foreground mb-4">
               {learningModules.length - 7} more modules available in the complete learning path
             </p>
-            <Link to="/learn">
+            <Link to="/docs/learn">
               <Button variant="outline">
                 View All Learning Modules
                 <ArrowRight className="w-4 h-4 ml-2" />
@@ -298,14 +299,14 @@ function WelcomePage() {
                 </Button>
               </Link>
             ) : (
-              <Link to="/learn">
+              <Link to="/docs/learn">
                 <Button size="lg" className="px-8 py-6 text-lg">
                   <Trophy className="w-5 h-5 mr-2" />
                   Explore All Modules
                 </Button>
               </Link>
             )}
-            <Link to="/learn">
+            <Link to="/docs/learn">
               <Button size="lg" variant="outline" className="px-8 py-6 text-lg">
                 <BookOpen className="w-5 h-5 mr-2" />
                 View Learning Path

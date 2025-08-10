@@ -103,14 +103,14 @@ function ReferencePage() {
             </div>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link to="/reference/adr">
+              <Link to="/docs/reference/adr">
                 <Button size="lg" className="px-8 py-6 text-lg">
                   <Target className="w-5 h-5 mr-2" />
                   Explore Architecture Decisions
                   <ArrowRight className="w-5 h-5 ml-2" />
                 </Button>
               </Link>
-              <Link to="/reference/api">
+              <Link to="/docs/reference/api">
                 <Button size="lg" variant="outline" className="px-8 py-6 text-lg">
                   <Code className="w-5 h-5 mr-2" />
                   API Documentation
@@ -292,14 +292,14 @@ function ReferencePage() {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link to="/reference/adr">
+            <Link to="/docs/reference/adr">
               <Button size="lg" className="px-8 py-6 text-lg">
                 <Target className="w-5 h-5 mr-2" />
                 Start with Architecture Decisions
                 <ArrowRight className="w-5 h-5 ml-2" />
               </Button>
             </Link>
-            <Link to="/reference/standards">
+            <Link to="/docs/reference/standards">
               <Button size="lg" variant="outline" className="px-8 py-6 text-lg">
                 <FileText className="w-5 h-5 mr-2" />
                 View Code Standards

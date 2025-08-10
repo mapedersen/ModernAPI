@@ -74,7 +74,7 @@ export function InlineLogin({ onSuccess, className }: InlineLoginProps) {
           if (onSuccess) {
             onSuccess()
           } else {
-            router.navigate({ to: '/learn' })
+            router.navigate({ to: '/docs/learn' })
           }
         }, 2000)
       }
