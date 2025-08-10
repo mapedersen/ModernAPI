@@ -13,7 +13,7 @@ import type {
 } from '~/types/auth'
 import type { GetUsersResponse } from '~/types/user'
 
-const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:5051'
+const API_BASE_URL = process.env.VITE_API_BASE_URL || 'http://localhost:5051'
 
 // Helper to extract cookies
 function extractTokenFromCookies(cookies: string, tokenName: string): string | null {
