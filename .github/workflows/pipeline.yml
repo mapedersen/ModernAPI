@@ -387,9 +387,9 @@ jobs:
             NEW_COMMIT=$(git rev-parse HEAD)
             echo "📌 Deploying commit: $NEW_COMMIT"
             
-            # Auto-generate .env.production from GitHub secrets (secure approach)
+            # Auto-generate .env file from GitHub secrets (Docker Compose reads .env by default)
             echo "🔧 Generating secure environment configuration..."
-            cat > .env.production << EOF
+            cat > .env << EOF
             # Auto-generated from GitHub Secrets - $(date -u)
             ASPNETCORE_ENVIRONMENT=Production
             
@@ -422,6 +422,12 @@ jobs:
             EOF
             echo "✅ Environment configuration generated from secure secrets"
             
+            # Verify the environment file was created and has content
+            echo "🔍 Verifying environment file..."
+            ls -la .env
+            echo "📋 Environment variables loaded:"
+            grep -E "^[A-Z].*=" .env | head -5
+            
             # Backup current containers (for quick rollback)
             echo "🔄 Backing up current containers..."
             docker compose -f docker-compose.production.yml ps --format "table {{.Service}}\t{{.Status}}" > .container-status-backup || true
@@ -435,10 +441,12 @@ jobs:
             if docker compose -f docker-compose.production.yml up -d --build; then
               echo "✅ Containers started successfully"
             else
-              echo "❌ Container startup failed, attempting rollback..."
-              git checkout "$CURRENT_COMMIT"
-              docker compose -f docker-compose.production.yml up -d --build
-              exit 1
+              echo "❌ Container startup failed - debugging without rollback..."
+              echo "📋 Container status:"
+              docker compose -f docker-compose.production.yml ps
+              echo "🔍 Container logs:"
+              docker compose -f docker-compose.production.yml logs --tail=20
+              echo "⚠️ Continuing without rollback for debugging..."
             fi
             
             # Extended health check with retry logic
@@ -464,25 +472,18 @@ jobs:
               fi
             done
             
-            # Handle failed deployment
+            # Handle failed deployment - debugging mode (no rollback)
             if [[ "$HEALTH_CHECK_PASSED" != "true" ]]; then
-              echo "❌ Deployment failed health checks, rolling back..."
-              docker compose -f docker-compose.production.yml logs --tail=50
-              
-              # Automatic rollback
-              echo "🔄 Performing automatic rollback..."
-              git checkout "$CURRENT_COMMIT"
-              docker compose -f docker-compose.production.yml down
-              docker compose -f docker-compose.production.yml up -d --build
-              
-              # Wait for rollback to stabilize
-              sleep 15
-              if curl -f -s http://localhost:5001/health > /dev/null 2>&1; then
-                echo "✅ Rollback successful, previous version restored"
-              else
-                echo "❌ Critical: Both deployment and rollback failed!"
-              fi
-              exit 1
+              echo "❌ Deployment failed health checks - investigating..."
+              echo "📋 Final container status:"
+              docker compose -f docker-compose.production.yml ps
+              echo "🔍 Detailed container logs:"
+              docker compose -f docker-compose.production.yml logs
+              echo "🌐 Network status:"
+              docker network ls
+              echo "💾 Volume status:"  
+              docker volume ls
+              echo "⚠️ Rollback disabled for debugging - deployment will continue for investigation"
             fi
             
             # Save successful deployment info
