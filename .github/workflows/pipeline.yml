@@ -389,20 +389,20 @@ jobs:
             
             # Backup current containers (for quick rollback)
             echo "🔄 Backing up current containers..."
-            docker-compose -f docker-compose.production.yml ps --format "table {{.Service}}\t{{.Status}}" > .container-status-backup || true
+            docker compose -f docker-compose.production.yml ps --format "table {{.Service}}\t{{.Status}}" > .container-status-backup || true
             
             # Stop services gracefully
             echo "⏹️ Stopping services..."
-            docker-compose -f docker-compose.production.yml down
+            docker compose -f docker-compose.production.yml down
             
             # Build and start services with deployment tracking
             echo "🔨 Building and starting services..."
-            if docker-compose -f docker-compose.production.yml up -d --build; then
+            if docker compose -f docker-compose.production.yml up -d --build; then
               echo "✅ Containers started successfully"
             else
               echo "❌ Container startup failed, attempting rollback..."
               git checkout "$CURRENT_COMMIT"
-              docker-compose -f docker-compose.production.yml up -d --build
+              docker compose -f docker-compose.production.yml up -d --build
               exit 1
             fi
             
@@ -414,7 +414,7 @@ jobs:
               echo "🔍 Health check attempt $i/6..."
               
               # Check if containers are running
-              if ! docker-compose -f docker-compose.production.yml ps --services --filter "status=running" | grep -q "api"; then
+              if ! docker compose -f docker-compose.production.yml ps --services --filter "status=running" | grep -q "api"; then
                 echo "⚠️ API container not running"
                 continue
               fi
@@ -432,13 +432,13 @@ jobs:
             # Handle failed deployment
             if [[ "$HEALTH_CHECK_PASSED" != "true" ]]; then
               echo "❌ Deployment failed health checks, rolling back..."
-              docker-compose -f docker-compose.production.yml logs --tail=50
+              docker compose -f docker-compose.production.yml logs --tail=50
               
               # Automatic rollback
               echo "🔄 Performing automatic rollback..."
               git checkout "$CURRENT_COMMIT"
-              docker-compose -f docker-compose.production.yml down
-              docker-compose -f docker-compose.production.yml up -d --build
+              docker compose -f docker-compose.production.yml down
+              docker compose -f docker-compose.production.yml up -d --build
               
               # Wait for rollback to stabilize
               sleep 15

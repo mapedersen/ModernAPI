@@ -234,16 +234,16 @@ jobs:
             
             # Stop services gracefully
             echo "⏹️ Stopping current services..."
-            docker-compose -f "$COMPOSE_FILE" down
+            docker compose -f "$COMPOSE_FILE" down
             
             # Build and start services
             echo "🔨 Building and starting services..."
-            if docker-compose -f "$COMPOSE_FILE" up -d --build; then
+            if docker compose -f "$COMPOSE_FILE" up -d --build; then
               echo "✅ Services started successfully"
             else
               echo "❌ Service startup failed, attempting rollback..."
               git checkout "$CURRENT_COMMIT" 2>/dev/null || echo "⚠️ Could not revert git state"
-              docker-compose -f "$COMPOSE_FILE" up -d --build
+              docker compose -f "$COMPOSE_FILE" up -d --build
               exit 1
             fi
             
@@ -260,8 +260,8 @@ jobs:
                 echo "❌ Health check failed after 10 attempts"
                 echo "🔄 Rolling back..."
                 git checkout "$CURRENT_COMMIT" 2>/dev/null || echo "⚠️ Could not revert git state"
-                docker-compose -f "$COMPOSE_FILE" down
-                docker-compose -f "$COMPOSE_FILE" up -d --build
+                docker compose -f "$COMPOSE_FILE" down
+                docker compose -f "$COMPOSE_FILE" up -d --build
                 exit 1
               else
                 echo "⏳ Health check attempt $i/10..."

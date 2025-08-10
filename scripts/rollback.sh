@@ -69,11 +69,11 @@ fi
 
 # Stop services
 echo "⏹️ Stopping services..."
-docker-compose -f "$COMPOSE_FILE" down
+docker compose -f "$COMPOSE_FILE" down
 
 # Start services with rolled back code
 echo "🔨 Starting services with rolled back code..."
-if docker-compose -f "$COMPOSE_FILE" up -d --build; then
+if docker compose -f "$COMPOSE_FILE" up -d --build; then
     echo "✅ Services started successfully"
 else
     echo "❌ Service startup failed"
