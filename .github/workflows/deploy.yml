@@ -68,7 +68,7 @@ jobs:
         
         # Copy Docker files
         cp docker-compose.production.yml deploy/docker/
-        cp backend/ModernAPI.API/Dockerfile deploy/docker/
+        cp backend/Dockerfile deploy/docker/
         cp frontend/Dockerfile deploy/docker/frontend.Dockerfile
 
     - name: Deploy to VPS
