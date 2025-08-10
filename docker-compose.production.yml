@@ -96,34 +96,34 @@ services:
       retries: 3
       start_period: 40s
 
-  # Frontend (TanStack Start with Bun SSR) - TEMPORARILY DISABLED FOR DEBUGGING
-  # frontend:
-  #   build:
-  #     context: ./frontend
-  #     dockerfile: Dockerfile
-  #     args:
-  #       - VITE_API_BASE_URL=${API_BASE_URL:-https://modernapi.dev}
-  #   container_name: modernapi_frontend
-  #   restart: unless-stopped
-  #   environment:
-  #     - NODE_ENV=production
-  #     - PORT=3000
-  #     - VITE_API_BASE_URL=${API_BASE_URL:-https://modernapi.dev}
-  #   ports:
-  #     - "3001:3000"
-  #   networks:
-  #     - modernapi_network
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         memory: 256M
-  #       reservations:
-  #         memory: 128M
-  #   healthcheck:
-  #     test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
-  #     interval: 30s
-  #     timeout: 5s
-  #     retries: 3
+  # Frontend (TanStack Start with Bun SSR)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_BASE_URL=${API_BASE_URL:-https://modernapi.dev}
+    container_name: modernapi_frontend
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - VITE_API_BASE_URL=${API_BASE_URL:-https://modernapi.dev}
+    ports:
+      - "3001:3000"
+    networks:
+      - modernapi_network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
 networks:
   modernapi_network:

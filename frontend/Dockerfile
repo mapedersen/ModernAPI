@@ -7,9 +7,9 @@ WORKDIR /app
 # Copy package files
 COPY package.json bun.lockb* ./
 
-# Install dependencies with bun
+# Install dependencies with bun - force x64 platform for Rollup compatibility
 RUN rm -rf node_modules bun.lockb && \
-    bun install --no-frozen-lockfile
+    PLATFORM=linux/amd64 bun install --no-frozen-lockfile --platform linux-x64
 
 # Copy source code
 COPY . .

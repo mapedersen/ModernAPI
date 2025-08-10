@@ -462,7 +462,7 @@ jobs:
                 continue
               fi
               
-              # Check if API responds
+              # Check if API responds (container internal port is 5000)
               if curl -f -s http://localhost:5001/health > /dev/null 2>&1; then
                 echo "✅ Health check passed"
                 HEALTH_CHECK_PASSED=true
