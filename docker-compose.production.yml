@@ -67,13 +67,6 @@ services:
       - JWT__Audience=${JWT_AUDIENCE:-ModernAPI-Users}
       - JWT__ExpiryMinutes=${JWT_EXPIRY_MINUTES:-60}
       - CORS__AllowedOrigins=${CORS_ORIGINS:-https://modernapi.dev}
-      - SMTP__Host=${SMTP_HOST}
-      - SMTP__Port=${SMTP_PORT:-587}
-      - SMTP__UseSSL=${SMTP_USE_SSL:-true}
-      - SMTP__Username=${SMTP_USERNAME}
-      - SMTP__Password=${SMTP_PASSWORD}
-      - Email__FromEmail=${FROM_EMAIL}
-      - Email__FromName=${FROM_NAME:-ModernAPI}
     ports:
       - "5001:5000"
     depends_on:

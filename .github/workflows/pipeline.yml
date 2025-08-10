@@ -440,13 +440,35 @@ jobs:
             echo "🔨 Building and starting services..."
             if docker compose --env-file .env -f docker-compose.production.yml up -d --build; then
               echo "✅ Containers started successfully"
+              
+              # Verify all containers are running
+              echo "📋 Verifying container status..."
+              docker compose --env-file .env -f docker-compose.production.yml ps
+              
+              # Check for any containers that failed to start
+              FAILED_CONTAINERS=$(docker compose --env-file .env -f docker-compose.production.yml ps --format json | jq -r 'select(.State != "running") | .Service' | tr '\n' ' ')
+              if [ -n "$FAILED_CONTAINERS" ]; then
+                echo "⚠️ Some containers failed to start: $FAILED_CONTAINERS"
+                echo "🔍 Getting logs for failed containers..."
+                for container in $FAILED_CONTAINERS; do
+                  echo "📋 Logs for $container:"
+                  docker compose --env-file .env -f docker-compose.production.yml logs --tail=50 $container
+                done
+              fi
             else
-              echo "❌ Container startup failed - debugging without rollback..."
+              echo "❌ Container build/startup failed"
               echo "📋 Container status:"
               docker compose --env-file .env -f docker-compose.production.yml ps
-              echo "🔍 Container logs:"
-              docker compose --env-file .env -f docker-compose.production.yml logs --tail=20
-              echo "⚠️ Continuing without rollback for debugging..."
+              echo "🔍 Build logs:"
+              docker compose --env-file .env -f docker-compose.production.yml logs --tail=100
+              echo "🔧 Attempting to identify the issue..."
+              
+              # Check if it's a build error
+              if docker compose --env-file .env -f docker-compose.production.yml build 2>&1 | grep -q "error"; then
+                echo "❌ Build error detected. Please check Dockerfile syntax and dependencies."
+              fi
+              
+              echo "⚠️ Deployment failed but continuing for debugging..."
             fi
             
             # Extended health check with retry logic
@@ -503,7 +525,7 @@ jobs:
       - name: 🧪 Production Health Check
         run: |
           echo "🔍 Running production health checks..."
-          VPS_URL="http://localhost:5001"
+          VPS_URL="http://${{ secrets.VPS_HOST }}:5001"
           
           for i in {1..15}; do
             if curl -f "$VPS_URL/health"; then
@@ -519,12 +541,11 @@ jobs:
           
       - name: 📊 Production Summary
         run: |
-          VPS_URL="${{ secrets.VPS_URL || 'http://your-vps-ip:5001' }}"
           echo "## 🚀 Production Deployment" >> $GITHUB_STEP_SUMMARY
           echo "- 🎯 Environment: **Production VPS**" >> $GITHUB_STEP_SUMMARY
           echo "- 📦 Version: \`${{ needs.orchestrator.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- 🔗 API URL: $VPS_URL" >> $GITHUB_STEP_SUMMARY
-          echo "- 🔗 Health Check: $VPS_URL/health" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔗 API URL: http://${{ secrets.VPS_HOST }}:5001" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔗 Health Check: http://${{ secrets.VPS_HOST }}:5001/health" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ Status: **LIVE**" >> $GITHUB_STEP_SUMMARY
 
   # ═══════════════════════════════════════════════════════════════════════════════
