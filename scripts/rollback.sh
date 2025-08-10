@@ -6,11 +6,11 @@ set -e
 # Environment: production (default) or staging
 
 ENVIRONMENT="${1:-production}"
-PROJECT_DIR="/opt/modernapi"
+PROJECT_DIR="/srv/modernapi"
 COMPOSE_FILE="docker-compose.production.yml"
 
 if [[ "$ENVIRONMENT" == "staging" ]]; then
-    PROJECT_DIR="/opt/modernapi-staging"
+    PROJECT_DIR="/srv/modernapi-staging"
     COMPOSE_FILE="docker-compose.staging.yml"
 fi
 

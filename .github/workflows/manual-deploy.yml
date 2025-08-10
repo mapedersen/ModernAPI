@@ -204,7 +204,7 @@ jobs:
             echo "🎯 Target: ${{ needs.prepare-deployment.outputs.target_environment }}"
             
             # Navigate to project directory
-            PROJECT_DIR="${{ needs.prepare-deployment.outputs.target_environment == 'production' && '/opt/modernapi' || '/opt/modernapi-staging' }}"
+            PROJECT_DIR="${{ needs.prepare-deployment.outputs.target_environment == 'production' && '/srv/modernapi' || '/srv/modernapi-staging' }}"
             cd "$PROJECT_DIR" || { echo "❌ Project directory not found: $PROJECT_DIR"; exit 1; }
             
             # Create rollback point - save current state

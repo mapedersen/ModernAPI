@@ -373,7 +373,7 @@ jobs:
             echo "🚀 Starting deployment to VPS..."
             
             # Navigate to project directory
-            cd /opt/modernapi || { echo "❌ Project directory not found"; exit 1; }
+            cd /srv/modernapi || { echo "❌ Project directory not found"; exit 1; }
             
             # Create rollback point - save current commit
             echo "💾 Creating rollback point..."
