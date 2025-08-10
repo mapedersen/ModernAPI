@@ -177,7 +177,7 @@ export function Header({ variant = 'default', showAuth = true }: HeaderProps) {
                 <Link to="/auth/login">Sign In</Link>
               </Button>
               <Button size="sm" asChild>
-                <Link to="/auth/register">Get Started</Link>
+                <Link to="/auth/login">Get Started</Link>
               </Button>
             </div>
           ) : null}
@@ -270,7 +270,7 @@ export function Header({ variant = 'default', showAuth = true }: HeaderProps) {
                         Sign In
                       </Button>
                     </Link>
-                    <Link to="/auth/register" onClick={() => setMobileMenuOpen(false)}>
+                    <Link to="/auth/login" onClick={() => setMobileMenuOpen(false)}>
                       <Button className="w-full justify-start gap-3">
                         <Settings className="w-4 h-4" />
                         Get Started
