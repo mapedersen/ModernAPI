@@ -1,7 +1,49 @@
-# Production Docker Compose Configuration
+# Production Docker Compose Configuration with Traefik Reverse Proxy
 # Auto-generates environment variables from GitHub secrets during deployment
 
 services:
+  # Traefik Reverse Proxy with Automatic SSL
+  traefik:
+    image: traefik:v3.0
+    container_name: modernapi_traefik
+    restart: unless-stopped
+    command:
+      - --api.dashboard=true
+      - --api.debug=true
+      - --log.level=INFO
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=modernapi_network
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --certificatesresolvers.letsencrypt.acme.tlschallenge=true
+      - --certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}
+      - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.web.http.redirections.entrypoint.permanent=true
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik_data:/letsencrypt
+    networks:
+      - modernapi_network
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.traefik.rule=Host(`traefik.${DOMAIN}`)
+      - traefik.http.routers.traefik.tls=true
+      - traefik.http.routers.traefik.tls.certresolver=letsencrypt
+      - traefik.http.routers.traefik.service=api@internal
+      - traefik.http.routers.traefik.middlewares=auth
+      - traefik.http.middlewares.auth.basicauth.users=${TRAEFIK_AUTH}
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
   # PostgreSQL Database
   postgres:
     image: postgres:16-alpine
@@ -69,9 +111,9 @@ services:
       - JWT__Issuer=${JWT_ISSUER:-ModernAPI}
       - JWT__Audience=${JWT_AUDIENCE:-ModernAPI-Users}
       - JWT__ExpiryMinutes=${JWT_EXPIRY_MINUTES:-60}
-      - CORS__AllowedOrigins=${CORS_ORIGINS:-https://modernapi.dev}
-    ports:
-      - "5001:5000"
+      - CORS__AllowedOrigins=https://${DOMAIN},https://api.${DOMAIN}
+    expose:
+      - "5000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -79,6 +121,12 @@ services:
         condition: service_healthy
     networks:
       - modernapi_network
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.api.rule=Host(`api.${DOMAIN}`)
+      - traefik.http.routers.api.tls=true
+      - traefik.http.routers.api.tls.certresolver=letsencrypt
+      - traefik.http.services.api.loadbalancer.server.port=5000
     deploy:
       resources:
         limits:
@@ -98,17 +146,23 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        - VITE_API_BASE_URL=${API_BASE_URL:-https://modernapi.dev}
+        - VITE_API_BASE_URL=https://api.${DOMAIN}
     container_name: modernapi_frontend
     restart: unless-stopped
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - VITE_API_BASE_URL=${API_BASE_URL:-https://modernapi.dev}
-    ports:
-      - "3001:3000"
+      - VITE_API_BASE_URL=https://api.${DOMAIN}
+    expose:
+      - "3000"
     networks:
       - modernapi_network
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.frontend.rule=Host(`${DOMAIN}`)
+      - traefik.http.routers.frontend.tls=true
+      - traefik.http.routers.frontend.tls.certresolver=letsencrypt
+      - traefik.http.services.frontend.loadbalancer.server.port=3000
     deploy:
       resources:
         limits:
@@ -129,4 +183,6 @@ volumes:
   postgres_data:
     driver: local
   redis_data:
+    driver: local
+  traefik_data:
     driver: local

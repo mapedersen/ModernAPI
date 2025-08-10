@@ -395,6 +395,9 @@ jobs:
             # Auto-generated from GitHub Secrets - $(date -u)
             ASPNETCORE_ENVIRONMENT=Production
             
+            # Domain Configuration
+            DOMAIN=${{ secrets.DOMAIN || 'modernapi.dev' }}
+            
             # Database Configuration
             POSTGRES_DB=modernapi_prod
             POSTGRES_USER=postgres
@@ -410,9 +413,13 @@ jobs:
             JWT_AUDIENCE=ModernAPI.Users
             JWT_EXPIRY_MINUTES=60
             
+            # Traefik & SSL Configuration
+            ACME_EMAIL=${{ secrets.ACME_EMAIL || 'admin@modernapi.dev' }}
+            TRAEFIK_AUTH=${{ secrets.TRAEFIK_AUTH }}
+            
             # CORS & API Configuration
-            CORS_ORIGINS=https://${{ secrets.DOMAIN }}
-            API_BASE_URL=https://${{ secrets.DOMAIN }}
+            CORS_ORIGINS=https://${{ secrets.DOMAIN || 'modernapi.dev' }},https://api.${{ secrets.DOMAIN || 'modernapi.dev' }}
+            API_BASE_URL=https://api.${{ secrets.DOMAIN || 'modernapi.dev' }}
             
             # Production Security Settings
             ENABLE_SWAGGER=false
