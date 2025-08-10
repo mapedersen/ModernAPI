@@ -430,22 +430,22 @@ jobs:
             
             # Backup current containers (for quick rollback)
             echo "🔄 Backing up current containers..."
-            docker compose -f docker-compose.production.yml ps --format "table {{.Service}}\t{{.Status}}" > .container-status-backup || true
+            docker compose --env-file .env -f docker-compose.production.yml ps --format "table {{.Service}}\t{{.Status}}" > .container-status-backup || true
             
             # Stop services gracefully
             echo "⏹️ Stopping services..."
-            docker compose -f docker-compose.production.yml down
+            docker compose --env-file .env -f docker-compose.production.yml down
             
             # Build and start services with deployment tracking
             echo "🔨 Building and starting services..."
-            if docker compose -f docker-compose.production.yml up -d --build; then
+            if docker compose --env-file .env -f docker-compose.production.yml up -d --build; then
               echo "✅ Containers started successfully"
             else
               echo "❌ Container startup failed - debugging without rollback..."
               echo "📋 Container status:"
-              docker compose -f docker-compose.production.yml ps
+              docker compose --env-file .env -f docker-compose.production.yml ps
               echo "🔍 Container logs:"
-              docker compose -f docker-compose.production.yml logs --tail=20
+              docker compose --env-file .env -f docker-compose.production.yml logs --tail=20
               echo "⚠️ Continuing without rollback for debugging..."
             fi
             
@@ -457,7 +457,7 @@ jobs:
               echo "🔍 Health check attempt $i/6..."
               
               # Check if containers are running
-              if ! docker compose -f docker-compose.production.yml ps --services --filter "status=running" | grep -q "api"; then
+              if ! docker compose --env-file .env -f docker-compose.production.yml ps --services --filter "status=running" | grep -q "api"; then
                 echo "⚠️ API container not running"
                 continue
               fi
@@ -476,9 +476,9 @@ jobs:
             if [[ "$HEALTH_CHECK_PASSED" != "true" ]]; then
               echo "❌ Deployment failed health checks - investigating..."
               echo "📋 Final container status:"
-              docker compose -f docker-compose.production.yml ps
+              docker compose --env-file .env -f docker-compose.production.yml ps
               echo "🔍 Detailed container logs:"
-              docker compose -f docker-compose.production.yml logs
+              docker compose --env-file .env -f docker-compose.production.yml logs
               echo "🌐 Network status:"
               docker network ls
               echo "💾 Volume status:"  
