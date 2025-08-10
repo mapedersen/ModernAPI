@@ -281,22 +281,39 @@ jobs:
       - name: 🐳 Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         
-      - name: 🏗️ Build Docker image for scanning
+      - name: 🏗️ Build backend Docker image for scanning
         uses: docker/build-push-action@v5
         with:
-          context: .
-          file: ./Dockerfile
-          tags: modernapi:security-scan
+          context: ./backend
+          file: ./backend/Dockerfile
+          tags: modernapi-backend:security-scan
           load: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
           
-      - name: 🔍 Run Trivy container scan
+      - name: 🏗️ Build frontend Docker image for scanning
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          tags: modernapi-frontend:security-scan
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          
+      - name: 🔍 Run Trivy backend container scan
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: 'modernapi:security-scan'
+          image-ref: 'modernapi-backend:security-scan'
           format: 'sarif'
-          output: 'trivy-container-results.sarif'
+          output: 'trivy-backend-results.sarif'
+          
+      - name: 🔍 Run Trivy frontend container scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'modernapi-frontend:security-scan'
+          format: 'sarif'
+          output: 'trivy-frontend-results.sarif'
           
       - name: 📊 Upload Trivy backend scan results
         if: always()
@@ -332,34 +349,72 @@ jobs:
           wget -O hadolint https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-x86_64
           chmod +x hadolint
           
-          # Run hadolint on Dockerfile
-          ./hadolint Dockerfile --format json > dockerfile-scan.json || true
+          # Run hadolint on backend Dockerfile
+          ./hadolint backend/Dockerfile --format json > dockerfile-backend-scan.json || true
           
-          # Check results
-          if [[ -s dockerfile-scan.json ]]; then
-            ERROR_COUNT=$(cat dockerfile-scan.json | jq 'length' 2>/dev/null || echo "0")
-            if [[ "$ERROR_COUNT" -gt 0 ]]; then
-              echo "⚠️ Found $ERROR_COUNT Dockerfile issues"
-              echo "## 🐳 Dockerfile Issues" >> docker-security-summary.md
+          # Run hadolint on frontend Dockerfile  
+          ./hadolint frontend/Dockerfile --format json > dockerfile-frontend-scan.json || true
+          
+          # Combine results
+          echo "[]" > dockerfile-scan.json
+          
+          # Check backend results
+          if [[ -s dockerfile-backend-scan.json ]]; then
+            BACKEND_ERROR_COUNT=$(cat dockerfile-backend-scan.json | jq 'length' 2>/dev/null || echo "0")
+            if [[ "$BACKEND_ERROR_COUNT" -gt 0 ]]; then
+              echo "⚠️ Found $BACKEND_ERROR_COUNT backend Dockerfile issues"
+              echo "## 🐳 Backend Dockerfile Issues" >> docker-security-summary.md
               echo '```json' >> docker-security-summary.md
-              cat dockerfile-scan.json >> docker-security-summary.md
+              cat dockerfile-backend-scan.json >> docker-security-summary.md
               echo '```' >> docker-security-summary.md
+              
+              # Add to combined results
+              jq -s '.[0] + .[1]' dockerfile-scan.json dockerfile-backend-scan.json > temp.json && mv temp.json dockerfile-scan.json
             fi
           fi
           
-      - name: 🔍 Docker Scout vulnerability scan
+          # Check frontend results
+          if [[ -s dockerfile-frontend-scan.json ]]; then
+            FRONTEND_ERROR_COUNT=$(cat dockerfile-frontend-scan.json | jq 'length' 2>/dev/null || echo "0")
+            if [[ "$FRONTEND_ERROR_COUNT" -gt 0 ]]; then
+              echo "⚠️ Found $FRONTEND_ERROR_COUNT frontend Dockerfile issues"
+              echo "## 🐳 Frontend Dockerfile Issues" >> docker-security-summary.md
+              echo '```json' >> docker-security-summary.md
+              cat dockerfile-frontend-scan.json >> docker-security-summary.md
+              echo '```' >> docker-security-summary.md
+              
+              # Add to combined results
+              jq -s '.[0] + .[1]' dockerfile-scan.json dockerfile-frontend-scan.json > temp.json && mv temp.json dockerfile-scan.json
+            fi
+          fi
+          
+      - name: 🔍 Docker Scout backend vulnerability scan
         if: github.event_name != 'pull_request'
         uses: docker/scout-action@v1
         with:
           command: cves
-          image: modernapi:security-scan
-          sarif-file: scout-results.sarif
+          image: modernapi-backend:security-scan
+          sarif-file: scout-backend-results.sarif
           
-      - name: 📊 Upload Docker Scout results
+      - name: 🔍 Docker Scout frontend vulnerability scan
+        if: github.event_name != 'pull_request'
+        uses: docker/scout-action@v1
+        with:
+          command: cves
+          image: modernapi-frontend:security-scan
+          sarif-file: scout-frontend-results.sarif
+          
+      - name: 📊 Upload Docker Scout backend results
         if: always() && github.event_name != 'pull_request'
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: scout-results.sarif
+          sarif_file: scout-backend-results.sarif
+          
+      - name: 📊 Upload Docker Scout frontend results
+        if: always() && github.event_name != 'pull_request'
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: scout-frontend-results.sarif
           
       - name: 📊 Upload Docker security scan results
         if: always()
@@ -367,11 +422,15 @@ jobs:
         with:
           name: docker-security-results
           path: |
-            trivy-container-results.sarif
+            trivy-backend-results.sarif
+            trivy-frontend-results.sarif
             trivy-fs-results.sarif
             dockerfile-scan.json
+            dockerfile-backend-scan.json
+            dockerfile-frontend-scan.json
             docker-security-summary.md
-            scout-results.sarif
+            scout-backend-results.sarif
+            scout-frontend-results.sarif
           retention-days: 30
           
   # =============================================================================
