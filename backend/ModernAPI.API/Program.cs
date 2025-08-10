@@ -40,7 +40,7 @@ foreach (var envFile in envFiles)
     if (File.Exists(fullPath))
     {
         DotNetEnv.Env.Load(fullPath);
-        Console.WriteLine($"Loaded environment file: {envFile}");
+        Console.WriteLine($"✅ Loaded environment file: {envFile}");
         break; // Load only the first matching file
     }
 }
