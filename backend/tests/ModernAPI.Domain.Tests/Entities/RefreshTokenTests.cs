@@ -147,11 +147,11 @@ public class RefreshTokenTests : DomainTestBase
         // Arrange
         var token = CreateValidTokenString();
         var userId = Guid.NewGuid();
-        var expiresAt = DateTime.UtcNow.AddMilliseconds(1); // Very short expiration
+        var expiresAt = DateTime.UtcNow.AddSeconds(1); // Short but safe expiration
         var refreshToken = new RefreshToken(token, userId, expiresAt);
         
         // Wait for expiration
-        Thread.Sleep(2);
+        Thread.Sleep(1100); // Wait slightly longer than 1 second
 
         // Act
         var isExpired = refreshToken.IsExpired();
