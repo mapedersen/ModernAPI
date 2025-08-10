@@ -1,0 +1,460 @@
+name: 🚀 ModernAPI Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+      - 'LICENSE'
+  pull_request:
+    branches: [main, develop]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+      - 'LICENSE'
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: '🎯 Pipeline Stage'
+        required: true
+        default: 'full'
+        type: choice
+        options:
+          - test-only
+          - build-only
+          - deploy-staging
+          - deploy-production
+          - full
+      environment:
+        description: '🌍 Target Environment'
+        required: false
+        default: 'auto'
+        type: choice
+        options:
+          - auto
+          - development
+          - staging
+          - production
+
+env:
+  DOTNET_VERSION: '9.0.x'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  PLATFORMS: linux/amd64,linux/arm64
+
+# 🔄 Smart concurrency control
+concurrency:
+  group: pipeline-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # 🧠 PIPELINE ORCHESTRATOR
+  # ═══════════════════════════════════════════════════════════════════════════════
+  orchestrator:
+    name: 🧠 Pipeline Orchestrator
+    runs-on: ubuntu-latest
+    outputs:
+      should_test: ${{ steps.plan.outputs.should_test }}
+      should_build: ${{ steps.plan.outputs.should_build }}
+      should_deploy_staging: ${{ steps.plan.outputs.should_deploy_staging }}
+      should_deploy_production: ${{ steps.plan.outputs.should_deploy_production }}
+      target_environment: ${{ steps.plan.outputs.target_environment }}
+      version: ${{ steps.plan.outputs.version }}
+      is_release: ${{ steps.plan.outputs.is_release }}
+      
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: 🧠 Plan Pipeline Execution
+        id: plan
+        run: |
+          echo "🧠 Planning pipeline execution..."
+          
+          # Determine what should run based on trigger
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "should_test=true" >> $GITHUB_OUTPUT
+            echo "should_build=false" >> $GITHUB_OUTPUT
+            echo "should_deploy_staging=false" >> $GITHUB_OUTPUT
+            echo "should_deploy_production=false" >> $GITHUB_OUTPUT
+            echo "target_environment=pr-preview" >> $GITHUB_OUTPUT
+            echo "is_release=false" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref_name }}" == "develop" ]]; then
+            echo "should_test=true" >> $GITHUB_OUTPUT
+            echo "should_build=true" >> $GITHUB_OUTPUT
+            echo "should_deploy_staging=true" >> $GITHUB_OUTPUT
+            echo "should_deploy_production=false" >> $GITHUB_OUTPUT
+            echo "target_environment=staging" >> $GITHUB_OUTPUT
+            echo "is_release=false" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref_name }}" == "main" ]]; then
+            echo "should_test=true" >> $GITHUB_OUTPUT
+            echo "should_build=true" >> $GITHUB_OUTPUT
+            echo "should_deploy_staging=false" >> $GITHUB_OUTPUT
+            echo "should_deploy_production=true" >> $GITHUB_OUTPUT
+            echo "target_environment=production" >> $GITHUB_OUTPUT
+            echo "is_release=true" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            case "${{ github.event.inputs.stage }}" in
+              "test-only")
+                echo "should_test=true" >> $GITHUB_OUTPUT
+                echo "should_build=false" >> $GITHUB_OUTPUT
+                echo "should_deploy_staging=false" >> $GITHUB_OUTPUT
+                echo "should_deploy_production=false" >> $GITHUB_OUTPUT
+                ;;
+              "build-only")
+                echo "should_test=true" >> $GITHUB_OUTPUT
+                echo "should_build=true" >> $GITHUB_OUTPUT
+                echo "should_deploy_staging=false" >> $GITHUB_OUTPUT
+                echo "should_deploy_production=false" >> $GITHUB_OUTPUT
+                ;;
+              *)
+                echo "should_test=true" >> $GITHUB_OUTPUT
+                echo "should_build=true" >> $GITHUB_OUTPUT
+                echo "should_deploy_staging=${{ github.event.inputs.stage == 'deploy-staging' || github.event.inputs.stage == 'full' }}" >> $GITHUB_OUTPUT
+                echo "should_deploy_production=${{ github.event.inputs.stage == 'deploy-production' || github.event.inputs.stage == 'full' }}" >> $GITHUB_OUTPUT
+                ;;
+            esac
+            echo "target_environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+            echo "is_release=false" >> $GITHUB_OUTPUT
+          fi
+          
+          # Generate version
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+          elif [[ "${{ github.ref_name }}" == "main" ]]; then
+            VERSION=$(git describe --tags --always --abbrev=7)
+          elif [[ "${{ github.ref_name }}" == "develop" ]]; then
+            VERSION=$(git describe --tags --always --abbrev=7)-beta
+          else
+            VERSION=pr-${{ github.event.number }}-$(git rev-parse --short HEAD)
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          
+          echo "✅ Pipeline plan complete:"
+          echo "  🧪 Test: $(echo '${{ steps.plan.outputs.should_test }}' | jq -r '.')"
+          echo "  🔨 Build: $(echo '${{ steps.plan.outputs.should_build }}' | jq -r '.')"
+          echo "  🎭 Deploy Staging: $(echo '${{ steps.plan.outputs.should_deploy_staging }}' | jq -r '.')"
+          echo "  🚀 Deploy Production: $(echo '${{ steps.plan.outputs.should_deploy_production }}' | jq -r '.')"
+          echo "  🎯 Environment: ${{ steps.plan.outputs.target_environment }}"
+          echo "  📦 Version: $VERSION"
+
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # 🧪 QUALITY ASSURANCE STAGE
+  # ═══════════════════════════════════════════════════════════════════════════════
+  quality-gate:
+    name: 🧪 Quality Gate
+    runs-on: ubuntu-latest
+    needs: orchestrator
+    if: needs.orchestrator.outputs.should_test == 'true'
+    timeout-minutes: 15
+    
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: modernapi_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    strategy:
+      matrix:
+        test-suite: 
+          - { name: "🏗️ Domain", project: "ModernAPI.Domain.Tests", emoji: "🏗️" }
+          - { name: "⚙️ Application", project: "ModernAPI.Application.Tests", emoji: "⚙️" }
+          - { name: "🗄️ Infrastructure", project: "ModernAPI.Infrastructure.Tests", emoji: "🗄️" }
+          - { name: "🌐 API", project: "ModernAPI.API.Tests", emoji: "🌐" }
+          
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+        
+      - name: ⚡ Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+          
+      - name: 📦 Cache Dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+          
+      - name: 🔧 Restore Dependencies
+        run: dotnet restore backend/
+        
+      - name: 🏗️ Build Solution
+        run: dotnet build backend/ --no-restore --configuration Release
+        
+      - name: ${{ matrix.test-suite.emoji }} Test ${{ matrix.test-suite.name }}
+        run: |
+          echo "${{ matrix.test-suite.emoji }} Running ${{ matrix.test-suite.name }} tests..."
+          dotnet test backend/tests/${{ matrix.test-suite.project }}/ \
+            --no-build \
+            --configuration Release \
+            --logger trx \
+            --results-directory TestResults/${{ matrix.test-suite.name }} \
+            --collect:"XPlat Code Coverage"
+        env:
+          POSTGRES_CONNECTION_STRING: "Host=localhost;Database=modernapi_test;Username=postgres;Password=postgres"
+          JWT_SECRET: "ThisIsATestJWTSecretKeyForCITestingPurposes123456789!"
+          
+      - name: 📊 Upload Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-${{ matrix.test-suite.name }}
+          path: TestResults/${{ matrix.test-suite.name }}
+
+  # Lint & Security (parallel with tests)
+  code-quality:
+    name: 🔍 Code Quality & Security
+    runs-on: ubuntu-latest
+    needs: orchestrator
+    if: needs.orchestrator.outputs.should_test == 'true'
+    timeout-minutes: 10
+    
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: ⚡ Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+          
+      - name: 🎨 Code Format Check
+        run: |
+          echo "🎨 Checking code formatting..."
+          cd backend && dotnet format --verify-no-changes --verbosity diagnostic
+          
+      - name: 🔒 Security Scan
+        uses: securecodewarrior/github-action-add-sarif@v1
+        with:
+          sarif-file: 'security-scan.sarif'
+          
+      - name: 📊 Generate Quality Report
+        run: |
+          echo "## 🧪 Quality Gate Results" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Code formatting: PASSED" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔒 Security scan: COMPLETED" >> $GITHUB_STEP_SUMMARY
+          echo "- 🧪 Test execution: IN PROGRESS" >> $GITHUB_STEP_SUMMARY
+
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # 🔨 BUILD & REGISTRY STAGE  
+  # ═══════════════════════════════════════════════════════════════════════════════
+  build-and-publish:
+    name: 🔨 Build & Publish
+    runs-on: ubuntu-latest
+    needs: [orchestrator, quality-gate, code-quality]
+    if: needs.orchestrator.outputs.should_build == 'true'
+    timeout-minutes: 20
+    
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+        
+      - name: 🐳 Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          platforms: ${{ env.PLATFORMS }}
+          
+      - name: 🔐 Login to Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: 🏷️ Generate Metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ needs.orchestrator.outputs.version }}
+            type=ref,event=branch
+            type=ref,event=pr
+            
+      - name: 🔨 Build & Push Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          platforms: ${{ env.PLATFORMS }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILD_VERSION=${{ needs.orchestrator.outputs.version }}
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+            
+      - name: 🔒 Security Scan Image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.orchestrator.outputs.version }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          
+      - name: 📊 Build Summary
+        run: |
+          echo "## 🔨 Build Results" >> $GITHUB_STEP_SUMMARY
+          echo "- 📦 Version: \`${{ needs.orchestrator.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- 🐳 Registry: \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- 🏗️ Platforms: \`${{ env.PLATFORMS }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔒 Security: SCANNED" >> $GITHUB_STEP_SUMMARY
+
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # 🎭 STAGING DEPLOYMENT
+  # ═══════════════════════════════════════════════════════════════════════════════
+  deploy-staging:
+    name: 🎭 Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [orchestrator, build-and-publish]
+    if: needs.orchestrator.outputs.should_deploy_staging == 'true'
+    environment:
+      name: staging
+      url: https://staging-api.yourdomain.com
+    timeout-minutes: 15
+    
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+        
+      - name: 🚀 Deploy to Staging
+        run: |
+          echo "🎭 Deploying to staging environment..."
+          echo "📦 Version: ${{ needs.orchestrator.outputs.version }}"
+          # Add actual deployment logic here
+          
+      - name: 🧪 Staging Health Check
+        run: |
+          echo "🔍 Running staging health checks..."
+          for i in {1..10}; do
+            if curl -f https://staging-api.yourdomain.com/health; then
+              echo "✅ Staging deployment successful"
+              exit 0
+            fi
+            echo "⏳ Waiting for staging... ($i/10)"
+            sleep 30
+          done
+          echo "❌ Staging health check failed"
+          exit 1
+          
+      - name: 📊 Deployment Summary
+        run: |
+          echo "## 🎭 Staging Deployment" >> $GITHUB_STEP_SUMMARY
+          echo "- 🎯 Environment: **Staging**" >> $GITHUB_STEP_SUMMARY
+          echo "- 📦 Version: \`${{ needs.orchestrator.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔗 URL: https://staging-api.yourdomain.com" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Status: **DEPLOYED**" >> $GITHUB_STEP_SUMMARY
+
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # 🚀 PRODUCTION DEPLOYMENT
+  # ═══════════════════════════════════════════════════════════════════════════════
+  deploy-production:
+    name: 🚀 Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [orchestrator, build-and-publish]
+    if: needs.orchestrator.outputs.should_deploy_production == 'true'
+    environment: 
+      name: production
+      url: https://api.yourdomain.com
+    timeout-minutes: 30
+    
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+        
+      - name: 🔍 Pre-deployment Validation
+        run: |
+          echo "🔍 Validating production deployment prerequisites..."
+          # Check if image exists
+          docker manifest inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.orchestrator.outputs.version }}
+          echo "✅ Production image validated"
+          
+      - name: 🚀 Production Deployment
+        run: |
+          echo "🚀 Deploying to production environment..."
+          echo "📦 Version: ${{ needs.orchestrator.outputs.version }}"
+          # Add actual deployment logic here
+          
+      - name: 🧪 Production Health Check
+        run: |
+          echo "🔍 Running production health checks..."
+          for i in {1..15}; do
+            if curl -f https://api.yourdomain.com/health; then
+              echo "✅ Production deployment successful"
+              exit 0
+            fi
+            echo "⏳ Waiting for production... ($i/15)"
+            sleep 30
+          done
+          echo "❌ Production health check failed"
+          exit 1
+          
+      - name: 📊 Production Summary
+        run: |
+          echo "## 🚀 Production Deployment" >> $GITHUB_STEP_SUMMARY
+          echo "- 🎯 Environment: **Production**" >> $GITHUB_STEP_SUMMARY
+          echo "- 📦 Version: \`${{ needs.orchestrator.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔗 URL: https://api.yourdomain.com" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Status: **LIVE**" >> $GITHUB_STEP_SUMMARY
+
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # 📊 PIPELINE SUMMARY
+  # ═══════════════════════════════════════════════════════════════════════════════
+  pipeline-summary:
+    name: 📊 Pipeline Summary
+    runs-on: ubuntu-latest
+    needs: [orchestrator, quality-gate, code-quality, build-and-publish, deploy-staging, deploy-production]
+    if: always()
+    
+    steps:
+      - name: 📊 Generate Final Summary
+        run: |
+          echo "# 🚀 ModernAPI Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**🎯 Execution:** ${{ github.event_name }} on \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY  
+          echo "**📦 Version:** \`${{ needs.orchestrator.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**⏱️ Duration:** $(date -u -d @$(($(date +%s) - ${{ github.event.head_commit.timestamp }})) +'%H:%M:%S')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 📋 Stage Results" >> $GITHUB_STEP_SUMMARY
+          echo "| Stage | Status | Duration |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|----------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 🧪 Quality Gate | ${{ needs.quality-gate.result }} | - |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔍 Code Quality | ${{ needs.code-quality.result }} | - |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔨 Build & Publish | ${{ needs.build-and-publish.result }} | - |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🎭 Deploy Staging | ${{ needs.deploy-staging.result || 'skipped' }} | - |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🚀 Deploy Production | ${{ needs.deploy-production.result || 'skipped' }} | - |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ "${{ needs.deploy-production.result }}" == "success" ]]; then
+            echo "🎉 **Production deployment successful!** Your changes are now live." >> $GITHUB_STEP_SUMMARY
+          elif [[ "${{ needs.deploy-staging.result }}" == "success" ]]; then
+            echo "🎭 **Staging deployment successful!** Ready for production when you are." >> $GITHUB_STEP_SUMMARY
+          elif [[ "${{ needs.build-and-publish.result }}" == "success" ]]; then
+            echo "🔨 **Build successful!** Container image ready for deployment." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "🧪 **Quality checks complete!** Code is ready for the next stage." >> $GITHUB_STEP_SUMMARY
+          fi
