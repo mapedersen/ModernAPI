@@ -95,6 +95,8 @@ textarea:focus-visible {
 }
 
 /* Ensure links are easily identifiable */
+/* Temporarily removed - causing issues with navigation links */
+/*
 a:not([class*="button"]):not([class*="btn"]) {
   text-decoration: underline;
   text-underline-offset: 2px;
@@ -103,6 +105,7 @@ a:not([class*="button"]):not([class*="btn"]) {
 a:hover {
   text-decoration-thickness: 2px;
 }
+*/
 
 /* Improve form accessibility */
 input[required],

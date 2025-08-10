@@ -26,7 +26,8 @@ import {
   BarChart3, 
   LogOut,
   User,
-  Settings
+  Settings,
+  Github
 } from 'lucide-react'
 import { useAuthStore } from '~/stores/auth'
 import { cn } from '~/lib/utils'
@@ -70,6 +71,13 @@ export function Header({ variant = 'default', showAuth = true }: HeaderProps) {
       href: '/docs',
       icon: <BookOpen className="w-4 h-4" />,
       active: isDocs
+    },
+    {
+      title: 'GitHub',
+      href: 'https://github.com/mapedersen/ModernAPI',
+      icon: <Github className="w-4 h-4" />,
+      active: false,
+      external: true
     }
   ]
 
@@ -104,22 +112,37 @@ export function Header({ variant = 'default', showAuth = true }: HeaderProps) {
         </Link>
 
         {/* Desktop Navigation */}
-        <div className="hidden md:flex flex-1">
-          <NavigationMenu>
-            <NavigationMenuList>
+        <div className="hidden md:flex flex-1 items-center h-16">
+          <NavigationMenu className="flex items-center h-full">
+            <NavigationMenuList className="flex items-center h-full !m-0">
               {visibleNavItems.map((item) => (
-                <NavigationMenuItem key={item.href}>
+                <NavigationMenuItem key={item.href} className="flex items-center">
                   <NavigationMenuLink asChild>
-                    <Link 
-                      to={item.href}
-                      className={cn(
-                        "group inline-flex h-10 w-max items-center justify-center rounded-md bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none disabled:pointer-events-none disabled:opacity-50 data-[active]:bg-accent/50 data-[state=open]:bg-accent/50 gap-2",
-                        item.active && "bg-accent text-accent-foreground"
-                      )}
-                    >
-                      {item.icon}
-                      {item.title}
-                    </Link>
+                    {item.external ? (
+                      <a 
+                        href={item.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={cn(
+                          "group inline-flex h-10 w-max items-center justify-center rounded-md bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none disabled:pointer-events-none disabled:opacity-50 data-[active]:bg-accent/50 data-[state=open]:bg-accent/50 gap-2",
+                          item.active && "bg-accent text-accent-foreground"
+                        )}
+                      >
+                        {item.icon}
+                        {item.title}
+                      </a>
+                    ) : (
+                      <Link 
+                        to={item.href}
+                        className={cn(
+                          "group inline-flex h-10 w-max items-center justify-center rounded-md bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none disabled:pointer-events-none disabled:opacity-50 data-[active]:bg-accent/50 data-[state=open]:bg-accent/50 gap-2",
+                          item.active && "bg-accent text-accent-foreground"
+                        )}
+                      >
+                        {item.icon}
+                        {item.title}
+                      </Link>
+                    )}
                   </NavigationMenuLink>
                 </NavigationMenuItem>
               ))}
@@ -128,7 +151,7 @@ export function Header({ variant = 'default', showAuth = true }: HeaderProps) {
         </div>
 
         {/* Auth Section */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 ml-auto">
           {showAuth && isAuthenticated && user ? (
             <div className="hidden md:flex items-center gap-3">
               <div className="flex items-center gap-2">
@@ -179,19 +202,37 @@ export function Header({ variant = 'default', showAuth = true }: HeaderProps) {
               
               <nav className="flex flex-col gap-4 mt-8">
                 {visibleNavItems.map((item) => (
-                  <Link 
-                    key={item.href}
-                    to={item.href}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={cn(
-                      "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors hover:bg-accent",
-                      item.active && "bg-accent text-accent-foreground"
-                    )}
-                  >
-                    {item.icon}
-                    {item.title}
-                    {item.active && <Badge variant="secondary" className="ml-auto">Current</Badge>}
-                  </Link>
+                  item.external ? (
+                    <a 
+                      key={item.href}
+                      href={item.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={cn(
+                        "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors hover:bg-accent",
+                        item.active && "bg-accent text-accent-foreground"
+                      )}
+                    >
+                      {item.icon}
+                      {item.title}
+                      {item.active && <Badge variant="secondary" className="ml-auto">Current</Badge>}
+                    </a>
+                  ) : (
+                    <Link 
+                      key={item.href}
+                      to={item.href}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={cn(
+                        "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors hover:bg-accent",
+                        item.active && "bg-accent text-accent-foreground"
+                      )}
+                    >
+                      {item.icon}
+                      {item.title}
+                      {item.active && <Badge variant="secondary" className="ml-auto">Current</Badge>}
+                    </Link>
+                  )
                 ))}
                 
                 {showAuth && isAuthenticated && user && (

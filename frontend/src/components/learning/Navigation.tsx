@@ -26,7 +26,7 @@ export function Navigation() {
   }
 
   return (
-    <nav className="fixed left-0 top-0 w-80 bg-card border-r border-border h-screen overflow-y-auto flex flex-col z-10">
+    <nav className="fixed left-0 top-14 w-80 bg-card border-r border-border h-[calc(100vh-3.5rem)] overflow-y-auto flex flex-col z-10">
       {/* Header */}
       <div className="p-6 border-b border-border">
         <Link to="/" className="flex items-center gap-3 group hover:bg-accent/50 rounded-lg p-2 -m-2 transition-colors mb-4">

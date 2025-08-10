@@ -9,13 +9,13 @@ export const Route = createFileRoute('/docs')({
 
 function DocsLayout() {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="bg-background">
       <Navigation />
-      {/* Theme toggle positioned in top-right */}
-      <div className="fixed top-4 right-4 z-50">
+      {/* Theme toggle positioned in top-right, accounting for header */}
+      <div className="fixed top-16 right-4 z-50">
         <ThemeToggle />
       </div>
-      <main className="ml-80 p-8">
+      <main className="ml-80 p-8 pt-4">
         <div className="max-w-4xl">
           {/* Breadcrumb Navigation */}
           <div className="mb-6">

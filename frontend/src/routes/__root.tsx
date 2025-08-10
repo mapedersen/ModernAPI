@@ -64,8 +64,8 @@ function RootComponent() {
   const isAuthRoute = location.pathname.startsWith('/auth')
   const isDashboardRoute = location.pathname.startsWith('/dashboard')
 
-  // Determine header variant and visibility
-  const showHeader = !isAuthRoute // Hide header on auth pages
+  // Always show header except for specific auth pages
+  const showHeader = true
   const headerVariant = isDocsRoute ? 'minimal' : 'default'
 
   return (
@@ -89,21 +89,18 @@ function RootComponent() {
             Skip to main content
           </a>
 
-          {/* Persistent Header */}
-          {showHeader && <Header variant={headerVariant} />}
+          {/* Persistent Header - always show for navigation consistency */}
+          {showHeader && <Header variant={headerVariant} showAuth={!isAuthRoute} />}
 
           <main id="main-content" className="focus:outline-none">
-            {isDocsRoute ? (
-              // Docs layout handled by docs.tsx
-              <Outlet />
-            ) : isDashboardRoute ? (
-              // Dashboard layout without additional header (has its own)
-              <div className="min-h-screen">
+            {isDashboardRoute ? (
+              // Dashboard layout with proper spacing for header
+              <div className="min-h-[calc(100vh-4rem)]">
                 <Outlet />
               </div>
             ) : (
-              // Clean main app layout with proper spacing
-              <div className={showHeader ? "min-h-[calc(100vh-4rem)]" : "min-h-screen"}>
+              // Clean main app layout with proper spacing for header
+              <div className="min-h-[calc(100vh-4rem)]">
                 <Outlet />
               </div>
             )}
