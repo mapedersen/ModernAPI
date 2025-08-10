@@ -5,8 +5,11 @@ WORKDIR /src
 # Copy entire source first (simpler approach)
 COPY . .
 
-# Restore and build in one step
-RUN dotnet publish ModernAPI.API/ModernAPI.API.csproj -c Release -o /app/publish
+# Restore with retry logic and build
+RUN dotnet restore --verbosity minimal --configfile NuGet.config || \
+    dotnet restore --verbosity minimal --force || \
+    dotnet restore --verbosity minimal
+RUN dotnet publish ModernAPI.API/ModernAPI.API.csproj -c Release -o /app/publish --no-restore
 
 # Runtime
 FROM mcr.microsoft.com/dotnet/aspnet:9.0-alpine AS runtime
