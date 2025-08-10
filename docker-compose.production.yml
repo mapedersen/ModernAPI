@@ -53,7 +53,7 @@ services:
   api:
     build:
       context: ./backend
-      dockerfile: Dockerfile.simple
+      dockerfile: Dockerfile
     container_name: modernapi_api
     restart: unless-stopped
     environment:

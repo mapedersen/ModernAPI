@@ -204,11 +204,12 @@ jobs:
       - name: ${{ matrix.test-suite.emoji }} Test ${{ matrix.test-suite.name }}
         run: |
           echo "${{ matrix.test-suite.emoji }} Running ${{ matrix.test-suite.name }} tests..."
+          SAFE_NAME=$(echo "${{ matrix.test-suite.name }}" | sed 's/[^a-zA-Z0-9]/-/g')
           dotnet test backend/tests/${{ matrix.test-suite.project }}/ \
             --no-build \
             --configuration Release \
             --logger trx \
-            --results-directory TestResults/${{ matrix.test-suite.name }} \
+            --results-directory "TestResults/${SAFE_NAME}" \
             --collect:"XPlat Code Coverage"
         env:
           POSTGRES_CONNECTION_STRING: "Host=localhost;Database=modernapi_test;Username=postgres;Password=postgres"
@@ -218,8 +219,8 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-results-${{ matrix.test-suite.name }}
-          path: TestResults/${{ matrix.test-suite.name }}
+          name: test-results-${{ matrix.test-suite.project }}
+          path: TestResults/
 
   # Lint & Security (parallel with tests)
   code-quality:
@@ -393,18 +394,63 @@ jobs:
           docker manifest inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.orchestrator.outputs.version }}
           echo "✅ Production image validated"
           
-      - name: 🚀 Production Deployment
-        run: |
-          echo "🚀 Deploying to production environment..."
-          echo "📦 Version: ${{ needs.orchestrator.outputs.version }}"
-          # Add actual deployment logic here
+      - name: 🚀 Deploy to VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script: |
+            echo "🚀 Starting deployment to VPS..."
+            
+            # Navigate to project directory
+            cd /opt/modernapi || { echo "❌ Project directory not found"; exit 1; }
+            
+            # Pull latest changes
+            echo "📥 Pulling latest code..."
+            git pull origin main
+            
+            # Pull latest images
+            echo "🐳 Pulling Docker images..."
+            docker-compose -f docker-compose.production.yml pull --ignore-pull-failures || true
+            
+            # Stop services gracefully
+            echo "⏹️ Stopping services..."
+            docker-compose -f docker-compose.production.yml down
+            
+            # Build and start services
+            echo "🔨 Building and starting services..."
+            docker-compose -f docker-compose.production.yml up -d --build
+            
+            # Verify deployment
+            echo "🔍 Verifying deployment..."
+            sleep 15
+            
+            # Health check
+            if docker-compose -f docker-compose.production.yml ps --services --filter "status=running" | grep -q "api"; then
+              echo "✅ API service is running"
+            else
+              echo "❌ API service failed to start"
+              docker-compose -f docker-compose.production.yml logs api
+              exit 1
+            fi
+            
+            # Clean up old images
+            echo "🧹 Cleaning up old images..."
+            docker image prune -f || true
+            
+            echo "🎉 Deployment completed successfully!"
           
       - name: 🧪 Production Health Check
         run: |
           echo "🔍 Running production health checks..."
+          VPS_URL="${{ secrets.VPS_URL || 'http://your-vps-ip:5001' }}"
+          
           for i in {1..15}; do
-            if curl -f https://api.yourdomain.com/health; then
+            if curl -f "$VPS_URL/health"; then
               echo "✅ Production deployment successful"
+              echo "🌐 API is live at: $VPS_URL"
               exit 0
             fi
             echo "⏳ Waiting for production... ($i/15)"
@@ -415,10 +461,12 @@ jobs:
           
       - name: 📊 Production Summary
         run: |
+          VPS_URL="${{ secrets.VPS_URL || 'http://your-vps-ip:5001' }}"
           echo "## 🚀 Production Deployment" >> $GITHUB_STEP_SUMMARY
-          echo "- 🎯 Environment: **Production**" >> $GITHUB_STEP_SUMMARY
+          echo "- 🎯 Environment: **Production VPS**" >> $GITHUB_STEP_SUMMARY
           echo "- 📦 Version: \`${{ needs.orchestrator.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- 🔗 URL: https://api.yourdomain.com" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔗 API URL: $VPS_URL" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔗 Health Check: $VPS_URL/health" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ Status: **LIVE**" >> $GITHUB_STEP_SUMMARY
 
   # ═══════════════════════════════════════════════════════════════════════════════
