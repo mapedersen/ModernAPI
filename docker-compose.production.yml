@@ -1,6 +1,8 @@
 # Production Docker Compose Configuration with Traefik Reverse Proxy
 # Auto-generates environment variables from GitHub secrets during deployment
 
+name: modernapi
+
 services:
   # Traefik Reverse Proxy with Automatic SSL
   traefik:
