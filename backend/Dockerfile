@@ -1,21 +1,34 @@
 # Production-ready Dockerfile for ModernAPI Backend
-FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:9.0-alpine AS build
 WORKDIR /src
 
-# Copy everything and restore
+# Copy csproj files and restore dependencies (better layer caching)
+COPY ["ModernAPI.API/ModernAPI.API.csproj", "ModernAPI.API/"]
+COPY ["ModernAPI.Application/ModernAPI.Application.csproj", "ModernAPI.Application/"]
+COPY ["ModernAPI.Domain/ModernAPI.Domain.csproj", "ModernAPI.Domain/"]
+COPY ["ModernAPI.Infrastructure/ModernAPI.Infrastructure.csproj", "ModernAPI.Infrastructure/"]
+RUN dotnet restore "ModernAPI.API/ModernAPI.API.csproj" --verbosity normal
+
+# Copy source code and build
 COPY . .
-RUN dotnet restore --verbosity normal
-RUN dotnet publish ModernAPI.API/ModernAPI.API.csproj -c Release -o /app/publish
+RUN dotnet publish ModernAPI.API/ModernAPI.API.csproj -c Release -o /app/publish --no-restore
 
 # Runtime
-FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:9.0-alpine AS runtime
 WORKDIR /app
 
-# Install curl for health checks
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+# Create non-root user for security
+RUN addgroup -g 1001 -S modernapi && \
+    adduser -S -D -H -u 1001 -h /app -s /sbin/nologin -G modernapi modernapi
 
-# Copy published app
-COPY --from=build /app/publish .
+# Install curl for health checks (Alpine uses apk)
+RUN apk add --no-cache curl
+
+# Copy published app with correct ownership
+COPY --from=build --chown=modernapi:modernapi /app/publish .
+
+# Switch to non-root user
+USER modernapi
 
 # Configure ports
 ENV ASPNETCORE_ENVIRONMENT=Production

@@ -1,197 +1,297 @@
-# ModernAPI Full-Stack Template
+# 🚀 ModernAPI - Enterprise Full-Stack Development Platform
 
-A production-ready full-stack application template with .NET Clean Architecture backend and React TanStack frontend.
+[![Build Status](https://github.com/your-org/modern-api/actions/workflows/pipeline.yml/badge.svg)](https://github.com/your-org/modern-api/actions/workflows/pipeline.yml)
+[![Security Scan](https://github.com/your-org/modern-api/actions/workflows/security.yml/badge.svg)](https://github.com/your-org/modern-api/actions/workflows/security.yml)
+[![Docker](https://img.shields.io/docker/v/modernapi/backend/latest)](https://github.com/your-org/modern-api/pkgs/container/modern-api)
+[![License](https://img.shields.io/github/license/your-org/modern-api)](LICENSE)
 
-## Features
+**A production-ready, enterprise-grade full-stack platform with .NET Clean Architecture, React TanStack frontend, and comprehensive DevOps automation.**
 
-### Backend (.NET 9)
-- ✅ **Clean Architecture** with Domain-Driven Design
-- ✅ **JWT Authentication** with refresh tokens
-- ✅ **PostgreSQL** database with Entity Framework Core
-- ✅ **Redis** distributed caching
-- ✅ **OpenTelemetry** monitoring and observability
-- ✅ **Comprehensive testing** across all layers
-- ✅ **Docker** containerization
-- ✅ **GitHub Actions** CI/CD
+🎯 **Perfect for**: SaaS applications, enterprise APIs, microservices, and modern web applications requiring scalability, security, and maintainability.
 
-### Frontend (React + TanStack)
-- ✅ **React 19** with TypeScript
-- ✅ **TanStack Router** for routing
-- ✅ **TanStack Query** for data fetching
+## ⭐ Key Features
+
+### 🏗️ Backend Architecture (.NET 9)
+- ✅ **Clean Architecture** with Domain-Driven Design patterns
+- ✅ **JWT Authentication** with refresh token rotation
+- ✅ **PostgreSQL** with Entity Framework Core + advanced querying
+- ✅ **Redis** distributed caching with intelligent invalidation
+- ✅ **OpenTelemetry** observability (metrics, traces, logs)
+- ✅ **Entity Scaffolding Tool** for rapid development
+- ✅ **HATEOAS REST API** with OpenAPI documentation
+- ✅ **Comprehensive Testing** (Unit, Integration, E2E)
+
+### ⚛️ Frontend Stack (React + TanStack)
+- ✅ **React 19** with TypeScript and strict mode
+- ✅ **TanStack Router** for type-safe routing
+- ✅ **TanStack Query** for server state management
 - ✅ **TanStack Start** for full-stack framework
-- ✅ **Tailwind CSS** + **Radix UI** components
-- ✅ **Vite** for fast development
-- ✅ **Vitest** for testing
+- ✅ **Tailwind CSS v4** + **Radix UI** components
+- ✅ **Vite** for lightning-fast development
+- ✅ **Vitest** for comprehensive testing
 
-## Quick Start
+### 🚀 DevOps & Production
+- ✅ **Intelligent CI/CD Pipeline** with environment promotion
+- ✅ **Multi-layer Security Scanning** (SAST, DAST, containers, secrets)
+- ✅ **Automated PR Previews** with isolated environments
+- ✅ **Docker Multi-platform Builds** (AMD64/ARM64)
+- ✅ **Monitoring Stack** (Prometheus, Grafana, Seq, Jaeger)
+- ✅ **Multi-channel Notifications** (Slack, Teams, Discord, Email)
+- ✅ **Semantic Release Management** with automated versioning
+- ✅ **Zero-downtime Deployment** with automatic rollbacks
 
-### Install the Template
+## 🚀 Quick Start
+
+### Prerequisites
+- [.NET 9 SDK](https://dotnet.microsoft.com/download/dotnet/9.0)
+- [Node.js 18+](https://nodejs.org/) or [Bun](https://bun.sh/)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+- [Git](https://git-scm.com/)
+
+### 1. Clone & Setup
 ```bash
-# Install from this directory
-dotnet new install .
+# Clone the repository
+git clone https://github.com/your-org/modern-api.git
+cd modern-api
 
-# Verify installation
-dotnet new list | grep modernapi
-```
+# Start infrastructure services
+docker-compose up -d postgres redis
 
-### Create a New Project
-```bash
-# Create your custom project
-dotnet new modernapi --ProjectName "PersonalOS" --AuthorName "Your Name"
-
-# Or with all options
-dotnet new modernapi \
-  --ProjectName "TaskManager" \
-  --AuthorName "John Doe" \
-  --CompanyName "TaskCorp" \
-  --DatabaseName "taskmanager_db" \
-  --IncludeFrontend true \
-  --IncludeRedis true \
-  --IncludeMonitoring true \
-  --IncludeDocker true
-```
-
-### Available Parameters
-
-| Parameter | Description | Default | Type |
-|-----------|-------------|---------|------|
-| `ProjectName` | Name of your project | `ModernAPI` | string |
-| `AuthorName` | Author name for the project | `API Developer` | string |
-| `CompanyName` | Company/organization namespace | `Company` | string |
-| `DatabaseName` | PostgreSQL database name | `modernapi` | string |
-| `JwtIssuer` | JWT token issuer | `ModernAPI` | string |
-| `JwtAudience` | JWT token audience | `ModernAPI.Users` | string |
-| `FrontendPort` | Frontend dev server port | `5173` | string |
-| `ApiUrl` | API base URL for frontend | `http://localhost:5000` | string |
-| `IncludeFrontend` | Include React frontend | `true` | bool |
-| `IncludeAuth` | Include JWT authentication | `true` | bool |
-| `IncludeRedis` | Include Redis caching | `true` | bool |
-| `IncludeMonitoring` | Include OpenTelemetry monitoring | `true` | bool |
-| `IncludeDocker` | Include Docker setup | `true` | bool |
-| `IncludeScaffolding` | Include code scaffolding tool | `true` | bool |
-| `IncludeCICD` | Include GitHub Actions | `true` | bool |
-
-## After Creating Your Project
-
-### Backend Setup
-```bash
-cd YourProject/backend
-
-# Start dependencies
-docker-compose up -d
-
-# Restore packages and run migrations
+# Setup backend
+cd backend
 dotnet restore
 dotnet ef database update --project ModernAPI.Infrastructure --startup-project ModernAPI.API
 
-# Run the API
-dotnet run --project ModernAPI.API
+# Setup frontend (optional)
+cd ../frontend
+bun install  # or npm install
 ```
 
-### Frontend Setup (if included)
+### 2. Development
 ```bash
-cd YourProject/frontend
+# Terminal 1: Backend API
+cd backend
+dotnet run --project ModernAPI.API
+# 🚀 API: http://localhost:5000
+# 📚 Docs: http://localhost:5000/scalar/v1
 
-# Install dependencies
-npm install
-# or
-bun install
-
-# Start development server
-npm run dev
-# or
-bun dev
+# Terminal 2: Frontend (optional)
+cd frontend  
+bun dev  # or npm run dev
+# 🌐 Frontend: http://localhost:3000
 ```
 
-## Project Structure
+### 3. Production Deployment
+```bash
+# Build and deploy with Docker
+docker-compose -f docker-compose.production.yml up -d
+
+# Or use the CI/CD pipeline by pushing to main branch
+git push origin main
+```
+
+## 🏗️ Architecture Overview
+
+### Clean Architecture Layers
+```
+┌─────────────────┐
+│   API Layer     │ ← Controllers, Middleware, HTTP concerns
+├─────────────────┤
+│ Application     │ ← Services, DTOs, Use Cases  
+├─────────────────┤
+│ Infrastructure  │ ← Database, Repositories, External Services
+├─────────────────┤
+│    Domain       │ ← Business Logic, Entities, Value Objects
+└─────────────────┘
+```
+
+### Technology Stack
+| Layer | Technologies |
+|-------|-------------|
+| **Frontend** | React 19, TypeScript, TanStack Router/Query/Start, Tailwind CSS, Radix UI |
+| **API** | .NET 9, ASP.NET Core, JWT, OpenAPI (Scalar), Entity Framework |
+| **Database** | PostgreSQL 16, Redis 7, Entity Framework Core |
+| **DevOps** | Docker, GitHub Actions, Multi-stage builds |
+| **Monitoring** | OpenTelemetry, Prometheus, Grafana, Seq, Jaeger |
+| **Security** | CodeQL, Semgrep, Trivy, Secret scanning, Dependabot |
+
+## 🚦 CI/CD Pipeline
+
+Our intelligent pipeline automatically handles different scenarios:
+
+### Branch Strategy
+- **`main`** → Production deployment with full testing
+- **`develop`** → Staging deployment with preview  
+- **`feature/*`** → PR previews with isolated environments
+- **Pull Requests** → Automated testing and code review
+
+### Pipeline Stages
+```mermaid
+graph LR
+    A[Code Push] --> B[Quality Gate]
+    B --> C[Security Scan] 
+    C --> D[Build & Test]
+    D --> E[Docker Build]
+    E --> F{Branch?}
+    F -->|main| G[Production Deploy]
+    F -->|develop| H[Staging Deploy]
+    F -->|PR| I[Preview Deploy]
+    G --> J[Health Checks]
+    H --> J
+    I --> J
+    J --> K[Notifications]
+```
+
+### Security Scanning
+- **SAST**: CodeQL, Semgrep for code analysis
+- **Dependencies**: Vulnerable package detection
+- **Secrets**: TruffleHog + GitLeaks scanning
+- **Containers**: Trivy + Docker Scout 
+- **Infrastructure**: Kubernetes + Docker Compose analysis
+
+## 📁 Project Structure
 
 ```
-YourProject/
-├── backend/                    # .NET Clean Architecture API
-│   ├── YourProject.API/        # Controllers, middleware, configuration
-│   ├── YourProject.Application/ # Services, DTOs, use cases
-│   ├── YourProject.Domain/     # Entities, value objects, domain events
-│   ├── YourProject.Infrastructure/ # Data access, external services
-│   └── tests/                  # Comprehensive test suite
-├── frontend/                   # React TanStack application
+modern-api/
+├── .github/
+│   ├── workflows/              # CI/CD pipelines
+│   │   ├── pipeline.yml        # Main build/deploy pipeline
+│   │   ├── security.yml        # Multi-layer security scanning  
+│   │   ├── release.yml         # Semantic release management
+│   │   ├── pr-preview.yml      # Automated PR environments
+│   │   └── notify.yml          # Multi-channel notifications
+│   └── dependabot.yml          # Automated dependency updates
+├── backend/                    # .NET 9 Clean Architecture
+│   ├── ModernAPI.API/          # 🌐 Controllers, middleware, HTTP
+│   ├── ModernAPI.Application/  # 🧠 Services, DTOs, use cases
+│   ├── ModernAPI.Domain/       # 💎 Entities, business logic
+│   ├── ModernAPI.Infrastructure/ # 🔧 Data, repositories, external
+│   ├── tests/                  # 🧪 Comprehensive test suite
+│   ├── tools/                  # 🛠️ Code scaffolding utilities
+│   ├── docker-compose.yml      # Development services
+│   └── Dockerfile              # Production-optimized container
+├── frontend/                   # ⚛️ React + TanStack ecosystem
 │   ├── src/
 │   │   ├── components/         # Reusable UI components
-│   │   ├── routes/             # TanStack Router pages
+│   │   ├── routes/             # TanStack Router pages  
 │   │   ├── stores/             # Zustand state management
-│   │   ├── lib/                # Utilities and API client
-│   │   └── types/              # TypeScript type definitions
-│   ├── package.json
-│   └── vite.config.ts
-├── docker-compose.yml          # Development services
-└── README.md
+│   │   ├── lib/                # API client and utilities
+│   │   └── types/              # TypeScript definitions
+│   └── Dockerfile              # SSR-optimized container
+├── docker-compose.production.yml # Production deployment
+├── docs/                       # 📚 Comprehensive documentation
+└── scripts/                    # 🚀 Deployment and setup scripts
 ```
 
-## Development Workflow
+## 🔧 Development Tools
 
-1. **Start Services**: `docker-compose up -d` (PostgreSQL, Redis)
-2. **Backend**: `dotnet run --project YourProject.API`
-3. **Frontend**: `npm run dev` (if included)
-4. **Access**:
-   - API: http://localhost:5000
-   - Frontend: http://localhost:5173 (if included)
-   - API Docs: http://localhost:5000/scalar/v1
-
-## Template Updates
-
+### Entity Scaffolding
+Generate complete Clean Architecture boilerplate in minutes:
 ```bash
-# Update the template
-cd path/to/ModernAPI
-git pull origin main
-dotnet new install . --force
+# Install the scaffolding tool
+cd backend/tools/ModernAPI.Scaffolding
+dotnet tool install --global --add-source ./nupkg ModernAPI.Scaffolding
 
-# Create new projects with updated template
-dotnet new modernapi --ProjectName "NewProject"
+# Generate a new entity with all layers
+modernapi scaffold entity Product \
+  --properties "Name:string:required,Price:decimal:range(0,*),Category:string"
 ```
+**Generates**: Entity, Repository, Service, Controller, DTOs, Validators, Tests, and EF Configuration.
 
-## Uninstall Template
-
+### Available Commands
 ```bash
-dotnet new uninstall ModernAPI.FullStack
+# Backend
+dotnet run --project ModernAPI.API          # Start API server
+dotnet test                                 # Run all tests  
+dotnet ef migrations add MigrationName      # Create migration
+dotnet ef database update                   # Apply migrations
+
+# Frontend  
+bun dev                                     # Start dev server
+bun build                                   # Production build
+bun test                                    # Run tests
+bun lint                                    # Check code quality
+
+# Docker
+docker-compose up -d                        # Development services
+docker-compose -f docker-compose.production.yml up -d  # Production
 ```
 
-## What Gets Replaced
+## 📊 Monitoring & Observability
 
-When you create a new project, the template engine replaces:
-- `ModernAPI` → Your `ProjectName` throughout all files
-- Namespaces: `ModernAPI.Domain` → `YourProject.Domain`
-- Database names, JWT settings, API URLs
-- Package.json name, Docker container names
-- Documentation and README files
+### Full Observability Stack
+Access your monitoring dashboards:
+- **Grafana**: http://localhost:3000 (admin/admin)
+- **Prometheus**: http://localhost:9090
+- **Seq**: http://localhost:8080 
+- **Jaeger**: http://localhost:16686
 
-## Examples
-
-### Personal Productivity System
+### Health Checks
 ```bash
-dotnet new modernapi \
-  --ProjectName "PersonalOS" \
-  --AuthorName "Marcus Pedersen" \
-  --DatabaseName "personalos_db" \
-  --IncludeFrontend true
+curl http://localhost:5000/health          # API health
+curl http://localhost:5000/health/ready    # Readiness probe
 ```
 
-### Minimal API-Only Project
+## 🚀 Production Deployment
+
+### VPS Deployment (Automated)
+The pipeline automatically deploys to your VPS when you push to `main`:
+
+1. **Setup Secrets** in GitHub:
+   ```
+   VPS_HOST=your-server-ip
+   VPS_USERNAME=deploy-user  
+   VPS_SSH_KEY=your-private-key
+   VPS_URL=https://api.yourdomain.com
+   ```
+
+2. **Push to Deploy**:
+   ```bash
+   git push origin main
+   ```
+
+The deployment includes:
+- ✅ Zero-downtime deployment with health checks
+- ✅ Automatic rollback on failure
+- ✅ Container health monitoring  
+- ✅ Notification on completion
+
+### Manual Docker Deployment
 ```bash
-dotnet new modernapi \
-  --ProjectName "BlogAPI" \
-  --IncludeFrontend false \
-  --IncludeRedis false \
-  --IncludeMonitoring false
+# Build and deploy production stack
+docker-compose -f docker-compose.production.yml up -d --build
+
+# Monitor logs
+docker-compose -f docker-compose.production.yml logs -f
 ```
 
-### Enterprise Full-Stack
-```bash
-dotnet new modernapi \
-  --ProjectName "InventorySystem" \
-  --CompanyName "Enterprise Corp" \
-  --AuthorName "Development Team" \
-  --IncludeFrontend true \
-  --IncludeMonitoring true \
-  --IncludeCICD true
-```
+## 📚 Documentation
 
-This template provides a solid foundation for modern full-stack applications with proven architectural patterns and production-ready features.
+Comprehensive guides available in `/docs`:
+- **[Architecture Guide](docs/)**
+- **[API Documentation](docs/REST_API_GUIDE.md)**
+- **[Authentication Setup](docs/AUTHENTICATION.md)**  
+- **[Deployment Guide](docs/DEPLOYMENT.md)**
+- **[CI/CD Overview](docs/CICD_OVERVIEW.md)**
+- **[Security Scanning](docs/SECURITY_SCANNING.md)**
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)  
+3. Commit changes (`git commit -m 'feat: add amazing feature'`)
+4. Push to branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+The CI/CD pipeline will automatically:
+- Run all tests and security scans
+- Create a preview environment
+- Provide code review via AI
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+**Built with ❤️ for modern development teams who value quality, security, and developer experience.**

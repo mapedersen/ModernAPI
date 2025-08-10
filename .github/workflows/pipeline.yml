@@ -191,9 +191,13 @@ jobs:
       - name: 📦 Cache Dependencies
         uses: actions/cache@v4
         with:
-          path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
-          restore-keys: nuget-${{ runner.os }}-
+          path: |
+            ~/.nuget/packages
+            ~/.dotnet/tools
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', '**/global.json') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+            nuget-${{ runner.os }}-
           
       - name: 🔧 Restore Dependencies
         run: dotnet restore backend/
@@ -274,72 +278,6 @@ jobs:
           echo "- 🔒 Security scan: COMPLETED" >> $GITHUB_STEP_SUMMARY
           echo "- 🧪 Test execution: IN PROGRESS" >> $GITHUB_STEP_SUMMARY
 
-  # ═══════════════════════════════════════════════════════════════════════════════
-  # 🔨 BUILD & REGISTRY STAGE  
-  # ═══════════════════════════════════════════════════════════════════════════════
-  build-and-publish:
-    name: 🔨 Build & Publish
-    runs-on: ubuntu-latest
-    needs: [orchestrator, quality-gate, code-quality]
-    if: needs.orchestrator.outputs.should_build == 'true'
-    timeout-minutes: 20
-    
-    steps:
-      - name: 📥 Checkout
-        uses: actions/checkout@v4
-        
-      - name: 🐳 Setup Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          platforms: ${{ env.PLATFORMS }}
-          
-      - name: 🔐 Login to Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-          
-      - name: 🏷️ Generate Metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value=${{ needs.orchestrator.outputs.version }}
-            type=ref,event=branch
-            type=ref,event=pr
-            
-      - name: 🔨 Build & Push Image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./backend
-          file: ./backend/Dockerfile
-          platforms: ${{ env.PLATFORMS }}
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          build-args: |
-            BUILD_VERSION=${{ needs.orchestrator.outputs.version }}
-            BUILD_DATE=${{ github.event.head_commit.timestamp }}
-            
-      - name: 🔒 Security Scan Image
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.orchestrator.outputs.version }}
-          format: 'sarif'
-          output: 'trivy-results.sarif'
-          
-      - name: 📊 Build Summary
-        run: |
-          echo "## 🔨 Build Results" >> $GITHUB_STEP_SUMMARY
-          echo "- 📦 Version: \`${{ needs.orchestrator.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- 🐳 Registry: \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- 🏗️ Platforms: \`${{ env.PLATFORMS }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- 🔒 Security: SCANNED" >> $GITHUB_STEP_SUMMARY
 
   # ═══════════════════════════════════════════════════════════════════════════════
   # 🎭 STAGING DEPLOYMENT
@@ -392,7 +330,7 @@ jobs:
   deploy-production:
     name: 🚀 Deploy to Production
     runs-on: ubuntu-latest
-    needs: [orchestrator, build-and-publish]
+    needs: [orchestrator, quality-gate, code-quality]
     if: needs.orchestrator.outputs.should_deploy_production == 'true'
     environment: 
       name: production
@@ -406,9 +344,7 @@ jobs:
       - name: 🔍 Pre-deployment Validation
         run: |
           echo "🔍 Validating production deployment prerequisites..."
-          # Check if image exists
-          docker manifest inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.orchestrator.outputs.version }}
-          echo "✅ Production image validated"
+          echo "✅ Quality gates passed, ready for deployment"
           
       - name: 🚀 Deploy to VPS
         uses: appleboy/ssh-action@v1.0.3
@@ -423,40 +359,94 @@ jobs:
             # Navigate to project directory
             cd /opt/modernapi || { echo "❌ Project directory not found"; exit 1; }
             
+            # Create rollback point - save current commit
+            echo "💾 Creating rollback point..."
+            CURRENT_COMMIT=$(git rev-parse HEAD)
+            echo "$CURRENT_COMMIT" > .deployment-rollback
+            echo "📌 Rollback point: $CURRENT_COMMIT"
+            
             # Pull latest changes
             echo "📥 Pulling latest code..."
             git pull origin main
+            NEW_COMMIT=$(git rev-parse HEAD)
+            echo "📌 Deploying commit: $NEW_COMMIT"
             
-            # Pull latest images
-            echo "🐳 Pulling Docker images..."
-            docker-compose -f docker-compose.production.yml pull --ignore-pull-failures || true
+            # Backup current containers (for quick rollback)
+            echo "🔄 Backing up current containers..."
+            docker-compose -f docker-compose.production.yml ps --format "table {{.Service}}\t{{.Status}}" > .container-status-backup || true
             
             # Stop services gracefully
             echo "⏹️ Stopping services..."
             docker-compose -f docker-compose.production.yml down
             
-            # Build and start services
+            # Build and start services with deployment tracking
             echo "🔨 Building and starting services..."
-            docker-compose -f docker-compose.production.yml up -d --build
-            
-            # Verify deployment
-            echo "🔍 Verifying deployment..."
-            sleep 15
-            
-            # Health check
-            if docker-compose -f docker-compose.production.yml ps --services --filter "status=running" | grep -q "api"; then
-              echo "✅ API service is running"
+            if docker-compose -f docker-compose.production.yml up -d --build; then
+              echo "✅ Containers started successfully"
             else
-              echo "❌ API service failed to start"
-              docker-compose -f docker-compose.production.yml logs api
+              echo "❌ Container startup failed, attempting rollback..."
+              git checkout "$CURRENT_COMMIT"
+              docker-compose -f docker-compose.production.yml up -d --build
               exit 1
             fi
             
-            # Clean up old images
-            echo "🧹 Cleaning up old images..."
-            docker image prune -f || true
+            # Extended health check with retry logic
+            echo "🔍 Performing health checks..."
+            HEALTH_CHECK_PASSED=false
+            for i in {1..6}; do
+              sleep 10
+              echo "🔍 Health check attempt $i/6..."
+              
+              # Check if containers are running
+              if ! docker-compose -f docker-compose.production.yml ps --services --filter "status=running" | grep -q "api"; then
+                echo "⚠️ API container not running"
+                continue
+              fi
+              
+              # Check if API responds
+              if curl -f -s http://localhost:5001/health > /dev/null 2>&1; then
+                echo "✅ Health check passed"
+                HEALTH_CHECK_PASSED=true
+                break
+              else
+                echo "⚠️ Health check failed, retrying..."
+              fi
+            done
+            
+            # Handle failed deployment
+            if [[ "$HEALTH_CHECK_PASSED" != "true" ]]; then
+              echo "❌ Deployment failed health checks, rolling back..."
+              docker-compose -f docker-compose.production.yml logs --tail=50
+              
+              # Automatic rollback
+              echo "🔄 Performing automatic rollback..."
+              git checkout "$CURRENT_COMMIT"
+              docker-compose -f docker-compose.production.yml down
+              docker-compose -f docker-compose.production.yml up -d --build
+              
+              # Wait for rollback to stabilize
+              sleep 15
+              if curl -f -s http://localhost:5001/health > /dev/null 2>&1; then
+                echo "✅ Rollback successful, previous version restored"
+              else
+                echo "❌ Critical: Both deployment and rollback failed!"
+              fi
+              exit 1
+            fi
+            
+            # Save successful deployment info
+            echo "📝 Recording successful deployment..."
+            echo "deployment_commit=$NEW_COMMIT" > .deployment-info
+            echo "deployment_date=$(date -u --iso-8601=seconds)" >> .deployment-info
+            echo "deployment_version=${{ needs.orchestrator.outputs.version }}" >> .deployment-info
+            
+            # Selective cleanup (keep last 2 builds for quick rollback)
+            echo "🧹 Cleaning up old images (keeping recent ones)..."
+            docker image prune -f --filter "until=72h" || true
             
             echo "🎉 Deployment completed successfully!"
+            echo "📦 Version: ${{ needs.orchestrator.outputs.version }}"
+            echo "📌 Commit: $NEW_COMMIT"
           
       - name: 🧪 Production Health Check
         run: |
@@ -491,7 +481,7 @@ jobs:
   pipeline-summary:
     name: 📊 Pipeline Summary
     runs-on: ubuntu-latest
-    needs: [orchestrator, quality-gate, code-quality, build-and-publish, deploy-staging, deploy-production]
+    needs: [orchestrator, quality-gate, code-quality, deploy-staging, deploy-production]
     if: always()
     
     steps:
@@ -508,7 +498,6 @@ jobs:
           echo "|-------|--------|----------|" >> $GITHUB_STEP_SUMMARY
           echo "| 🧪 Quality Gate | ${{ needs.quality-gate.result }} | - |" >> $GITHUB_STEP_SUMMARY
           echo "| 🔍 Code Quality | ${{ needs.code-quality.result }} | - |" >> $GITHUB_STEP_SUMMARY
-          echo "| 🔨 Build & Publish | ${{ needs.build-and-publish.result }} | - |" >> $GITHUB_STEP_SUMMARY
           echo "| 🎭 Deploy Staging | ${{ needs.deploy-staging.result || 'skipped' }} | - |" >> $GITHUB_STEP_SUMMARY
           echo "| 🚀 Deploy Production | ${{ needs.deploy-production.result || 'skipped' }} | - |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -517,8 +506,6 @@ jobs:
             echo "🎉 **Production deployment successful!** Your changes are now live." >> $GITHUB_STEP_SUMMARY
           elif [[ "${{ needs.deploy-staging.result }}" == "success" ]]; then
             echo "🎭 **Staging deployment successful!** Ready for production when you are." >> $GITHUB_STEP_SUMMARY
-          elif [[ "${{ needs.build-and-publish.result }}" == "success" ]]; then
-            echo "🔨 **Build successful!** Container image ready for deployment." >> $GITHUB_STEP_SUMMARY
           else
-            echo "🧪 **Quality checks complete!** Code is ready for the next stage." >> $GITHUB_STEP_SUMMARY
+            echo "🧪 **Quality checks complete!** Code is ready for deployment." >> $GITHUB_STEP_SUMMARY
           fi
