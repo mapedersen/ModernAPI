@@ -387,6 +387,41 @@ jobs:
             NEW_COMMIT=$(git rev-parse HEAD)
             echo "📌 Deploying commit: $NEW_COMMIT"
             
+            # Auto-generate .env.production from GitHub secrets (secure approach)
+            echo "🔧 Generating secure environment configuration..."
+            cat > .env.production << EOF
+            # Auto-generated from GitHub Secrets - $(date -u)
+            ASPNETCORE_ENVIRONMENT=Production
+            
+            # Database Configuration
+            POSTGRES_DB=modernapi_prod
+            POSTGRES_USER=postgres
+            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+            DATABASE_CONNECTION=${{ secrets.DATABASE_CONNECTION }}
+            
+            # Redis Configuration
+            REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
+            
+            # JWT Authentication
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            JWT_ISSUER=ModernAPI
+            JWT_AUDIENCE=ModernAPI.Users
+            JWT_EXPIRY_MINUTES=60
+            
+            # CORS & API Configuration
+            CORS_ORIGINS=https://${{ secrets.DOMAIN }}
+            API_BASE_URL=https://${{ secrets.DOMAIN }}
+            
+            # Production Security Settings
+            ENABLE_SWAGGER=false
+            ENABLE_DETAILED_ERRORS=false
+            ENABLE_SENSITIVE_DATA_LOGGING=false
+            LOG_LEVEL=Warning
+            ENABLE_HSTS=true
+            HTTPS_REDIRECT=true
+            EOF
+            echo "✅ Environment configuration generated from secure secrets"
+            
             # Backup current containers (for quick rollback)
             echo "🔄 Backing up current containers..."
             docker compose -f docker-compose.production.yml ps --format "table {{.Service}}\t{{.Status}}" > .container-status-backup || true
