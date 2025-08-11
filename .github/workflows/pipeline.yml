@@ -493,8 +493,8 @@ jobs:
                 continue
               fi
               
-              # Check if API responds (container internal port is 5000)
-              if curl -f -s http://localhost:5001/health > /dev/null 2>&1; then
+              # Check if API responds through Traefik (domain-based routing)
+              if curl -f -s -H "Host: api.${DOMAIN}" http://localhost/health > /dev/null 2>&1; then
                 echo "✅ Health check passed"
                 HEALTH_CHECK_PASSED=true
                 break
@@ -534,7 +534,7 @@ jobs:
       - name: 🧪 Production Health Check
         run: |
           echo "🔍 Running production health checks..."
-          VPS_URL="http://${{ secrets.VPS_HOST }}:5001"
+          VPS_URL="https://api.${{ secrets.DOMAIN || 'modernapi.dev' }}"
           
           for i in {1..15}; do
             if curl -f "$VPS_URL/health"; then
@@ -553,8 +553,9 @@ jobs:
           echo "## 🚀 Production Deployment" >> $GITHUB_STEP_SUMMARY
           echo "- 🎯 Environment: **Production VPS**" >> $GITHUB_STEP_SUMMARY
           echo "- 📦 Version: \`${{ needs.orchestrator.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- 🔗 API URL: http://${{ secrets.VPS_HOST }}:5001" >> $GITHUB_STEP_SUMMARY
-          echo "- 🔗 Health Check: http://${{ secrets.VPS_HOST }}:5001/health" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔗 Frontend: https://${{ secrets.DOMAIN || 'modernapi.dev' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔗 API URL: https://api.${{ secrets.DOMAIN || 'modernapi.dev' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔗 Health Check: https://api.${{ secrets.DOMAIN || 'modernapi.dev' }}/health" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ Status: **LIVE**" >> $GITHUB_STEP_SUMMARY
 
   # ═══════════════════════════════════════════════════════════════════════════════
