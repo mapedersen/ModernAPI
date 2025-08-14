@@ -1,6 +1,6 @@
 # Pipeline-friendly Dockerfile that builds inside container
 # Uses Node.js for build (better Rollup compatibility) then Bun for runtime
-FROM node:20-alpine AS build
+FROM node:24-alpine AS build
 
 # Set working directory
 WORKDIR /app
