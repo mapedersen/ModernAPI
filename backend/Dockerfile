@@ -15,7 +15,7 @@ RUN dotnet restore ModernAPI.API/ModernAPI.API.csproj --verbosity minimal || \
 RUN dotnet publish ModernAPI.API/ModernAPI.API.csproj -c Release -o /app/publish --no-restore
 
 # Runtime
-FROM mcr.microsoft.com/dotnet/aspnet:9.0-alpine AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS runtime
 WORKDIR /app
 
 # Install curl for health checks
